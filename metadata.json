@@ -1,0 +1,8 @@
+{
+  "name": "UniversalBot Multi-Channel",
+  "description": "Assistant expert pour bot multi-plateformes (WA, TG, IG) avec IA générative.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

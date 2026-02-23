@@ -1,0 +1,15 @@
+# Environnement virtuel
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Secrets
+.env
+
+# Base de données locale (si SQLite est utilisé)
+*.db
+
+# Téléchargements temporaires
+downloads/
