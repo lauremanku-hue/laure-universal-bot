@@ -1,1 +1,1 @@
-web: gunicorn laure_bot:app 
+web: gunicorn "app:create_app()"
