@@ -5,7 +5,7 @@ Ce projet est le moteur du bot Laure, capable de gérer WhatsApp, Telegram, Mess
 ## Arborescence du Projet
 
 ```text
-whatsapp_bot/
+laure_universel/
 ├── app/                    # Code principal de l'application Flask
 │   ├── modules/            # Handlers spécifiques par plateforme et IA
 │   │   ├── ai_handler.py       # Moteur Gemini / IA
@@ -29,4 +29,5 @@ whatsapp_bot/
 2. L'activer : `source venv/bin/activate` (Linux/Mac) ou `venv\Scripts\activate` (Windows)
 3. Installer les dépendances : `pip install -r requirements.txt`
 4. Configurer le fichier `.env`
-5. Lancer le bot : `python laure_bot.py`
+5. Lancer le bot (développement) : `python laure_bot.py`
+6. Lancer le bot (production) : `gunicorn laure_bot:app`
