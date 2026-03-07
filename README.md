@@ -5,7 +5,6 @@ Ce projet est le moteur du bot Laure, capable de gérer WhatsApp, Telegram, Mess
 ## Arborescence du Projet
 
 ```text
-laure_universel/
 ├── app/                    # Code principal de l'application Flask
 │   ├── modules/            # Handlers spécifiques par plateforme et IA
 │   │   ├── ai_handler.py       # Moteur Gemini / IA
@@ -18,8 +17,9 @@ laure_universel/
 │   ├── tasks.py            # Tâches asynchrones (Celery)
 │   └── __init__.py         # Initialisation de l'app Flask
 ├── celery_worker.py        # Point d'entrée pour le worker Celery
-├── laure_bot.py            # Script de lancement principal
+├── laure_bot.py            # Script de lancement principal (Flask)
 ├── requirements.txt        # Dépendances Python
+├── Procfile                # Configuration pour Railway/Render
 └── .env                    # Variables secrètes (NE PAS ENVOYER SUR GIT)
 ```
 
