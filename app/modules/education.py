@@ -6,6 +6,9 @@ class EducationModule:
     def __init__(self):
         self.quiz_categories = {"it": 18, "science": 17, "histoire": 23, "geo": 22, "general": 9}
 
+    def get_lesson(self, topic):
+        return f"Voici une leçon sur {topic}."
+
     def get_wiki_summary(self, topic):
         if not topic: return "Précise un sujet."
         formatted_topic = topic.replace(" ", "_").capitalize()

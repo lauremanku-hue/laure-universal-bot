@@ -9,6 +9,9 @@ class EntertainmentModule:
             {"q": "Plus il y en a, moins on voit.", "a": "L'obscurité"},
             {"q": "Plus je sèche, plus je deviens mouillé.", "a": "Une serviette"}
         ]
+    def get_joke(self):
+        return "Pourquoi les plongeurs plongent-ils toujours en arrière et jamais en avant ? Parce que sinon ils tombent dans le bateau."
+
 
     def get_online_joke(self):
         url = "https://api.blablagues.net/?rub=blagues"
