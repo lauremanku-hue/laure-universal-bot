@@ -1,6 +1,6 @@
 import os
 from flask import Flask
-from .extensions import db, celery
+from .extensions import db, celery_app
 from .routes import main
 
 def create_app():
@@ -20,7 +20,7 @@ def create_app():
     db.init_app(app)
     
     # Configuration Celery
-    celery.conf.update(
+    celery_app.conf.update(
         broker_url=os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
         result_backend=os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
         task_ignore_result=True
@@ -29,7 +29,7 @@ def create_app():
     # On attache celery à l'app pour y accéder facilement
     if not hasattr(app, 'extensions'):
         app.extensions = {}
-    app.extensions['celery'] = celery
+    app.extensions['celery'] = celery_app
     
     # Enregistrement des blueprints
     app.register_blueprint(main)
