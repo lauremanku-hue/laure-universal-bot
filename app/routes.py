@@ -41,7 +41,7 @@ def process_command(user, msg, platform):
     db.session.commit()
 
     # Infos de contact
-    contact_info = "\n\n📧 Contact : laure.support@example.com\n📱 WhatsApp : +229 00000000"
+    contact_info = "\n\n📧 Contact : laure.support@example.com\n📱 WhatsApp : +237 659867487/686683246"
 
     # 1. MENU & AIDE
     if msg.lower() in ['aide', 'menu', '/start', '/menu']:
@@ -223,6 +223,7 @@ def privacy():
         
         <h2>1. Collecte des données</h2>
         <p>Nous collectons uniquement les informations strictement nécessaires au fonctionnement du service :</p>
+        <li>Votre numéro de téléphone lors des transactions de paiement pour la validation de l'abonnement Premium.</li>
         <ul>
             <li>Votre identifiant de plateforme (WhatsApp ID ou Telegram ID).</li>
             <li>Le contenu des messages que vous envoyez au bot pour permettre à l'IA de vous répondre.</li>
