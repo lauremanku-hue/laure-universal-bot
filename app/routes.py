@@ -1,3 +1,4 @@
+
 import os
 from flask import Blueprint, request, jsonify, make_response
 from datetime import datetime, timedelta
@@ -77,7 +78,8 @@ def process_command(user, msg, platform):
 
     # 2. PAIEMENT
     elif msg.lower() == '/pay':
-        payment_url = f"https://www.monetbil.com/pay/v2.1/votre_service_id?amount=100&phone={user.platform_id}&externalId={user.id}"
+        service_id = os.getenv("MONETBIL_SERVICE_ID", "votre_id_ici")
+        payment_url = f"https://www.monetbil.com/pay/v2.1/{service_id}?amount=100&phone={user.platform_id}&externalId={user.id}"
         return {"message": f"💳 *DEVENIR PREMIUM*\n\nAccédez au téléchargement illimité, à la génération d'images HD et recevez *500 Mo de BONUS* (MTN/Orange) !\n\n🔗 *Lien de paiement sécurisé* : {payment_url}\n\n_Une fois payé, votre compte sera activé instantanément._"}
 
     # 3. IA IMAGE (Premium Check)
@@ -197,6 +199,53 @@ def payment_success():
 @main.route('/payment/fail')
 def payment_fail():
     return "<h1>Paiement échoué</h1><p>Veuillez réessayer ou contacter le support.</p>"
+
+@main.route('/privacy')
+@main.route('/privacy/')
+def privacy():
+    return """
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Politique de Confidentialité - Laure Bot</title>
+        <style>
+            body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
+            h1 { color: #2c3e50; }
+            .date { color: #7f8c8d; font-style: italic; }
+        </style>
+    </head>
+    <body>
+        <h1>Politique de Confidentialité - Laure Bot</h1>
+        <p class="date">Dernière mise à jour : 09 Mars 2026</p>
+        <p>Laure Bot est un service d'assistance par intelligence artificielle. Nous accordons une grande importance à la protection de vos données personnelles.</p>
+        
+        <h2>1. Collecte des données</h2>
+        <p>Nous collectons uniquement les informations strictement nécessaires au fonctionnement du service :</p>
+        <ul>
+            <li>Votre identifiant de plateforme (WhatsApp ID ou Telegram ID).</li>
+            <li>Le contenu des messages que vous envoyez au bot pour permettre à l'IA de vous répondre.</li>
+        </ul>
+
+        <h2>2. Utilisation des données</h2>
+        <p>Vos données sont utilisées exclusivement pour :</p>
+        <ul>
+            <li>Générer des réponses personnalisées via l'IA.</li>
+            <li>Gérer votre abonnement Premium le cas échéant.</li>
+        </ul>
+
+        <h2>3. Partage des données</h2>
+        <p>Nous ne vendons, ne louons et ne partageons jamais vos données personnelles avec des tiers à des fins commerciales.</p>
+
+        <h2>4. Contact</h2>
+        <p>Pour toute question, vous pouvez nous contacter à l'adresse e-mail de support indiquée dans le menu du bot.</p>
+    </body>
+    </html>
+    """
+
+@main.route('/webhook/telegram', methods=['POST'])
+def telegram_webhook():
     data = request.json
     if data and "message" in data:
         chat_id = str(data["message"]["chat"]["id"])
