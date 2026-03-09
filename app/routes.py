@@ -41,21 +41,37 @@ def process_command(user, msg, platform):
     db.session.commit()
 
     # Infos de contact
-    contact_info = "\n\n📧 Contact : laure.support@example.com\n📱 WhatsApp : +237 659867487/686683246"
+    contact_info = "\n\n📧 Contact : laure.support@example.com\n📱 WhatsApp : +237 6659867487/686683246"
 
     # 1. MENU & AIDE
     if msg.lower() in ['aide', 'menu', '/start', '/menu']:
         menu_text = (
-            "🚀 *MENU LAURE - VOTRE ASSISTANT UNIVERSEL*\n\n"
-            "Bonjour ! Je suis Laure, votre assistant IA multi-plateformes.\n\n"
-            "*COMMANDES DISPONIBLES :*\n"
-            "🎨 `/img <texte>` : Générer une image par IA\n"
-            "📥 *Envoyez un lien* (YouTube/FB/IG) : Télécharger la vidéo\n"
-            "💳 `/pay` : Devenir membre Premium\n"
-            "❓ *Posez-moi n'importe quelle question !*"
+            "🚀 *LAURE - TON ASSISTANTE IA TOUT-EN-UN* 🚀\n\n"
+            "Salut ! Je suis Laure. Je suis là pour t'aider à apprendre, créer et t'amuser ! ✨\n\n"
+            "💡 *CE QUE JE PEUX FAIRE POUR TOI :*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🧠 *Répondre à tout* : Pose-moi n'importe quelle question !\n"
+            "🎨 *Créer des images* : Tape `/img ton idée` (ex: /img un lion en costume)\n"
+            "📥 *Télécharger* : Envoie-moi un lien YouTube/FB/TikTok/IG\n"
+            "🎁 *Gagner* : Tape `/cadeau` pour voir tes bonus\n"
+            "💎 *Devenir VIP* : Tape `/pay` pour l'illimité + 500 Mo offerts !\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📢 *PARTAGE LAURE* : Transfère ce message à tes amis pour les aider aussi !"
             f"{contact_info}"
         )
         return {"message": menu_text}
+
+    # 1.1 COMMANDE CADEAU / PARRAINAGE
+    elif msg.lower() == '/cadeau':
+        referral_link = f"https://wa.me/923436404197048?text=Menu" # On utilise le numéro Meta
+        gift_text = (
+            "🎁 *TES CADEAUX LAURE* 🎁\n\n"
+            "✅ *Bonus de bienvenue* : 100 FCFA déjà crédités !\n"
+            "🔥 *OFFRE SPÉCIALE* : Partage ton lien avec 5 amis et gagne *1 jour de Premium GRATUIT* !\n\n"
+            f"🔗 *Ton lien de partage* : {referral_link}\n\n"
+            "_Plus tu partages, plus Laure devient intelligente pour toi !_"
+        )
+        return {"message": gift_text}
 
     # 1.5 COMMANDE ADMIN (Réservée)
     elif msg.lower() == '/admin':
@@ -78,9 +94,42 @@ def process_command(user, msg, platform):
 
     # 2. PAIEMENT
     elif msg.lower() == '/pay':
+        plans_text = (
+            "💎 *CHOISIS TON PLAN VIP LAURE* 💎\n\n"
+            "Débloque tout le potentiel de Laure :\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "1️⃣ *1 SEMAINE* : 500 FCFA\n"
+            "👉 Tape `/pay 1` pour ce plan\n\n"
+            "2️⃣ *2,5 SEMAINES* : 750 FCFA\n"
+            "👉 Tape `/pay 2` pour ce plan\n\n"
+            "3️⃣ *1 MOIS* : 1500 FCFA\n"
+            "👉 Tape `/pay 3` pour ce plan\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🎁 *BONUS* : 500 Mo de DATA offerts pour chaque abonnement !"
+        )
+        return {"message": plans_text}
+
+    elif msg.lower().startswith('/pay '):
+        choice = msg.split(' ')[1]
         service_id = os.getenv("MONETBIL_SERVICE_ID", "votre_id_ici")
-        payment_url = f"https://www.monetbil.com/pay/v2.1/{service_id}?amount=100&phone={user.platform_id}&externalId={user.id}"
-        return {"message": f"💳 *DEVENIR PREMIUM*\n\nAccédez au téléchargement illimité, à la génération d'images HD et recevez *500 Mo de BONUS* (MTN/Orange) !\n\n🔗 *Lien de paiement sécurisé* : {payment_url}\n\n_Une fois payé, votre compte sera activé instantanément._"}
+        
+        plans = {
+            "1": {"amount": 500, "label": "1 Semaine"},
+            "2": {"amount": 750, "label": "2,5 Semaines"},
+            "3": {"amount": 1500, "label": "1 Mois"}
+        }
+        
+        if choice in plans:
+            plan = plans[choice]
+            payment_url = f"https://www.monetbil.com/pay/v2.1/{service_id}?amount={plan['amount']}&phone={user.platform_id}&externalId={user.id}&item_name=Premium_{plan['label']}"
+            return {"message": (
+                f"💳 *PAIEMENT PLAN {plan['label'].upper()}*\n\n"
+                f"💰 Montant : {plan['amount']} FCFA\n"
+                f"🔗 *Lien sécurisé* : {payment_url}\n\n"
+                "_Ton compte sera activé automatiquement après le paiement._"
+            )}
+        else:
+            return {"message": "❌ Plan invalide. Tape `/pay` pour voir les options."}
 
     # 3. IA IMAGE (Premium Check)
     elif msg.startswith('/img '):
@@ -223,17 +272,18 @@ def privacy():
         
         <h2>1. Collecte des données</h2>
         <p>Nous collectons uniquement les informations strictement nécessaires au fonctionnement du service :</p>
-        <li>Votre numéro de téléphone lors des transactions de paiement pour la validation de l'abonnement Premium.</li>
         <ul>
             <li>Votre identifiant de plateforme (WhatsApp ID ou Telegram ID).</li>
             <li>Le contenu des messages que vous envoyez au bot pour permettre à l'IA de vous répondre.</li>
+            <li>Votre numéro de téléphone lors des transactions de paiement pour la validation de l'abonnement Premium.</li>
         </ul>
 
         <h2>2. Utilisation des données</h2>
         <p>Vos données sont utilisées exclusivement pour :</p>
         <ul>
             <li>Générer des réponses personnalisées via l'IA.</li>
-            <li>Gérer votre abonnement Premium le cas échéant.</li>
+            <li>Traiter vos paiements de manière sécurisée via notre partenaire <strong>Monetbil</strong>.</li>
+            <li>Gérer votre abonnement Premium et vos accès aux fonctionnalités avancées.</li>
         </ul>
 
         <h2>3. Partage des données</h2>
@@ -243,6 +293,16 @@ def privacy():
         <p>Pour toute question, vous pouvez nous contacter à l'adresse e-mail de support indiquée dans le menu du bot.</p>
     </body>
     </html>
+    """
+
+@main.route('/download-app')
+def download_app():
+    # Cette route permettra aux utilisateurs de télécharger l'APK directement
+    # Tu devras placer ton fichier laure_bot.apk dans le dossier /static/
+    return """
+    <h1>Télécharger Laure Bot</h1>
+    <p>Cliquez sur le bouton ci-dessous pour télécharger l'application Android (APK).</p>
+    <a href="/static/laure_bot.apk" style="padding: 10px 20px; background: #25D366; color: white; text-decoration: none; border-radius: 5px;">Télécharger l'APK</a>
     """
 
 @main.route('/webhook/telegram', methods=['POST'])
