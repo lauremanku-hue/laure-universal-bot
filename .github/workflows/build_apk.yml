@@ -1,3 +1,4 @@
+
 name: Build Flutter APK
 
 on:
@@ -11,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -36,7 +37,7 @@ jobs:
           flutter build apk --release
 
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: laure-bot-apk
           path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
