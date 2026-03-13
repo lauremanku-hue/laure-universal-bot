@@ -1,4 +1,3 @@
-
 import os
 import requests
 from io import BytesIO
@@ -34,12 +33,16 @@ class AIHandler:
             return "Désolé, mon cerveau (IA) n'est pas encore connecté. Contactez l'admin !"
         
         try:
-            # Ajout d'un timeout ou d'une gestion plus fine si nécessaire
-            response = self.model.generate_content(prompt)
-            if response and response.text:
+            # Nettoyage du prompt pour éviter les erreurs de caractères spéciaux
+            safe_prompt = str(prompt).encode('utf-8', 'ignore').decode('utf-8')
+            response = self.model.generate_content(safe_prompt)
+            
+            if response and hasattr(response, 'text'):
                 return response.text
+            elif response and hasattr(response, 'parts'):
+                return "".join([p.text for p in response.parts if hasattr(p, 'text')])
             else:
-                return "Je n'ai pas pu formuler de réponse. Réessaie avec une autre question !"
+                return "Je n'ai pas pu formuler de réponse claire. Peux-tu reformuler ?"
         except Exception as e:
             error_msg = str(e)
             print(f"❌ Erreur Gemini Text : {error_msg}")
