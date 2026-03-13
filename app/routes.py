@@ -72,8 +72,9 @@ def process_command(user, msg, platform):
                 "🧠 *IA Illimitée* : Pose toutes tes questions sans fin.\n"
                 "🎨 *Création d'Images* : Tape `/img ton idée` (Illimité)\n"
                 "📥 *Téléchargements* : Envoie n'importe quel lien (YouTube, TikTok, etc.)\n"
+                "🎓 *Cours* : Tape `/cours` pour apprendre\n"
+                "🎭 *Divertissement* : Tape `/fun` pour t'amuser\n"
                 "👤 *Statut* : Tape `statut` pour voir tes infos\n"
-                "🎁 *Parrainage* : Tape `/cadeau` pour inviter tes amis\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "📢 *PARTAGE LAURE* : Aide tes amis à découvrir Laure !"
                 f"{contact_info}"
@@ -87,8 +88,9 @@ def process_command(user, msg, platform):
                 "🧠 *Répondre à tout* : Pose-moi n'importe quelle question !\n"
                 "🎨 *Créer des images* : Tape `/img ton idée` (Réservé VIP 💎)\n"
                 "📥 *Télécharger* : Envoie un lien (Réservé VIP 💎)\n"
+                "🎓 *Cours* : Tape `/cours` (Réservé VIP 💎)\n"
+                "🎭 *Divertissement* : Tape `/fun` pour blagues et jeux\n"
                 "👤 *Mon Profil* : Tape `statut` pour voir tes bonus\n"
-                "🎁 *Gagner* : Tape `/cadeau` pour parrainer\n"
                 "💎 *Devenir VIP* : Tape `/pay` pour l'illimité + 500 Mo offerts !\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "📢 *PARTAGE LAURE* : Transfère ce message à tes amis !"
@@ -184,6 +186,21 @@ def process_command(user, msg, platform):
             "👉 _Dis-moi simplement : 'Laure, je veux un cours sur [sujet]'_"
         )
         return {"message": cours_text}
+
+    # 2.6 DIVERTISSEMENT (Fun & Jeux)
+    elif msg_clean in ['/fun', 'fun', 'divertissement', 'jeu', 'blague']:
+        fun_text = (
+            "🎭 *ESPACE DIVERTISSEMENT* 🎭\n\n"
+            "Besoin d'une pause ? Laure est aussi là pour ça !\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "😂 *Blagues* : Tape `Laure, raconte-moi une blague`\n"
+            "🧠 *Quiz* : Tape `Laure, lance un quiz` pour tester tes connaissances\n"
+            "💡 *Anecdotes* : Tape `Laure, donne-moi un fait incroyable`\n"
+            "🖼️ *Stickers* : Envoie-moi une image et je la transformerai (VIP 💎)\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "👉 _Amuse-toi bien avec Laure !_"
+        )
+        return {"message": fun_text + warning}
 
     elif msg_clean.startswith('/pay '):
         choice = msg_clean.split(' ')[1]
