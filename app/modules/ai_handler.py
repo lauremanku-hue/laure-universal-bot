@@ -1,3 +1,4 @@
+
 import os
 import requests
 from io import BytesIO
@@ -15,8 +16,14 @@ class AIHandler:
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
         if self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            try:
+                genai.configure(api_key=self.api_key)
+                # Utilisation d'un modèle plus récent et stable
+                self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                print("✅ Gemini configuré avec succès.")
+            except Exception as e:
+                self.model = None
+                print(f"❌ Erreur configuration Gemini : {e}")
         else:
             self.model = None
             print("⚠️ GEMINI_API_KEY non configurée.")
@@ -27,10 +34,19 @@ class AIHandler:
             return "Désolé, mon cerveau (IA) n'est pas encore connecté. Contactez l'admin !"
         
         try:
+            # Ajout d'un timeout ou d'une gestion plus fine si nécessaire
             response = self.model.generate_content(prompt)
-            return response.text
+            if response and response.text:
+                return response.text
+            else:
+                return "Je n'ai pas pu formuler de réponse. Réessaie avec une autre question !"
         except Exception as e:
-            print(f"❌ Erreur Gemini Text : {e}")
+            error_msg = str(e)
+            print(f"❌ Erreur Gemini Text : {error_msg}")
+            if "API_KEY_INVALID" in error_msg:
+                return "⚠️ Erreur technique : La clé API de l'IA est invalide. Contactez l'admin."
+            elif "quota" in error_msg.lower():
+                return "⏳ Je suis un peu fatiguée (quota atteint). Réessaie dans quelques minutes !"
             return "Oups, j'ai eu un petit bug en réfléchissant. Réessaie plus tard !"
 
     def generate_image_from_text(self, prompt):
@@ -60,4 +76,3 @@ class AIHandler:
             return {"status": "success", "path": sticker_path}
         except Exception as e:
             return {"status": "error", "message": str(e)}
-
