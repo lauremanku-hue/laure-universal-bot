@@ -4,7 +4,7 @@ import requests
 class WhatsAppHandler:
     def __init__(self):
         self.access_token = os.getenv("WHATSAPP_TOKEN")
-        self.phone_number_id = os.getenv("PHONE_NUMBER_ID") # Match config.py
+        self.phone_number_id = os.getenv("PHONE_NUMBER_ID") or os.getenv("WHATSAPP_PHONE_ID")
         self.version = "v18.0"
         self.url = f"https://graph.facebook.com/{self.version}/{self.phone_number_id}/messages"
 
