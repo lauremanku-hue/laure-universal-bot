@@ -40,7 +40,7 @@ def process_command(user, msg, platform):
     db.session.commit()
 
     # Infos de contact
-    contact_info = "\n\n📧 Contact : laure.support@example.com\n📱 WhatsApp : +229 00000000"
+    contact_info = "\n\n📧 Contact : lauresontia659@gmail.com\n📱 WhatsApp : +237 686683246/659867487"
 
     # 1. MENU & AIDE
     if msg.lower() in ['aide', 'menu', '/start', '/menu']:
