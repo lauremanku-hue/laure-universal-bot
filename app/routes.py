@@ -34,16 +34,18 @@ except Exception as e:
 
 def process_command(user, msg, platform):
     """Cerveau du bot : traite les messages et décide de la réponse."""
+    msg_clean = msg.strip().lower()
+    
     # Logique d'interaction
     new_int = Interaction(user_id=user.id, last_message=msg)
     db.session.add(new_int)
     db.session.commit()
 
     # Infos de contact
-    contact_info = "\n\n📧 Contact : lauresontia659@gmail.com\n📱 WhatsApp : +237 686683246/659867487"
+    contact_info = "\n\n📧 Contact : lauresontia659@gmail.com\n📱 WhatsApp : +237 686683246"
 
     # 1. MENU & AIDE
-    if msg.lower() in ['aide', 'menu', '/start', '/menu']:
+    if msg_clean in ['aide', 'menu', '/start', '/menu', 'laure']:
         menu_text = (
             "🚀 *LAURE - TON ASSISTANTE IA TOUT-EN-UN* 🚀\n\n"
             "Salut ! Je suis Laure. Je suis là pour t'aider à apprendre, créer et t'amuser ! ✨\n\n"
@@ -52,7 +54,7 @@ def process_command(user, msg, platform):
             "🧠 *Répondre à tout* : Pose-moi n'importe quelle question !\n"
             "🎨 *Créer des images* : Tape `/img ton idée` (ex: /img un lion en costume)\n"
             "📥 *Télécharger* : Envoie-moi un lien YouTube/FB/TikTok/IG\n"
-            "👤 *Mon Profil* : Tape `/profil` pour voir tes bonus\n"
+            "👤 *Mon Profil* : Tape `/profil` ou `statut` pour voir tes bonus\n"
             "🎁 *Gagner* : Tape `/cadeau` pour parrainer\n"
             "💎 *Devenir VIP* : Tape `/pay` pour l'illimité + 500 Mo offerts !\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
@@ -61,8 +63,8 @@ def process_command(user, msg, platform):
         )
         return {"message": menu_text}
 
-    # 1.1 COMMANDE PROFIL
-    elif msg.lower() == '/profil':
+    # 1.1 COMMANDE PROFIL / STATUT
+    elif msg_clean in ['/profil', 'profil', 'statut', 'mon profil']:
         status = "💎 PREMIUM (Illimité)" if user.is_premium else "🆓 GRATUIT (Limité)"
         bonus_status = "✅ Reçu (100 FCFA)" if user.bonus_given else "❌ Non reçu"
         data_status = "✅ Envoyé (500 Mo)" if user.data_bonus_given else "⏳ En attente (Abonne-toi !)"
@@ -80,7 +82,7 @@ def process_command(user, msg, platform):
         return {"message": profil_text}
 
     # 1.2 COMMANDE CADEAU / PARRAINAGE
-    elif msg.lower() == '/cadeau':
+    elif msg_clean == '/cadeau':
         bot_number = os.getenv("PHONE_NUMBER_ID", "923436404197048") # Valeur par défaut si non trouvé
         referral_link = f"https://wa.me/{bot_number}?text=Menu"
         gift_text = (
@@ -93,7 +95,7 @@ def process_command(user, msg, platform):
         return {"message": gift_text}
 
     # 1.5 COMMANDE ADMIN (Réservée)
-    elif msg.lower() == '/admin':
+    elif msg_clean == '/admin':
         admin_id = os.getenv("ADMIN_ID")
         if user.platform_id == admin_id:
             total_users = User.query.count()
@@ -112,7 +114,7 @@ def process_command(user, msg, platform):
             return {"message": "🚫 Commande réservée à l'administrateur."}
 
     # 2. PAIEMENT
-    elif msg.lower() == '/pay':
+    elif msg_clean == '/pay':
         plans_text = (
             "💎 *CHOISIS TON PLAN VIP LAURE* 💎\n\n"
             "Débloque tout le potentiel de Laure :\n"
@@ -128,8 +130,8 @@ def process_command(user, msg, platform):
         )
         return {"message": plans_text}
 
-    elif msg.lower().startswith('/pay '):
-        choice = msg.split(' ')[1]
+    elif msg_clean.startswith('/pay '):
+        choice = msg_clean.split(' ')[1]
         service_id = os.getenv("MONETBIL_SERVICE_ID", "votre_id_ici")
         
         plans = {
@@ -151,11 +153,11 @@ def process_command(user, msg, platform):
             return {"message": "❌ Plan invalide. Tape `/pay` pour voir les options."}
 
     # 3. IA IMAGE (Premium Check)
-    elif msg.startswith('/img '):
+    elif msg_clean.startswith('/img '):
         if not user.is_premium:
             return {"message": "❌ *ACCÈS PREMIUM REQUIS*\n\nCette fonctionnalité est réservée aux abonnés. Tapez */pay* pour activer votre accès !"}
         if ai:
-            prompt = msg.replace('/img ', '')
+            prompt = msg.replace('/img ', '').replace('/IMG ', '')
             res = ai.generate_image_from_text(prompt)
             return {"message": f"🎨 Image générée pour : {prompt}\nLien : {res.get('url')}"}
         return {"message": "Moteur d'image indisponible."}
@@ -218,6 +220,7 @@ def whatsapp_webhook():
                                 res = wa_handler.send_text(sender, welcome_msg)
                                 print(f"📤 Réponse bienvenue envoyée : {res}")
 
+                        print(f"⚙️ Traitement de la commande pour {sender}...")
                         resp = process_command(user, text, 'whatsapp')
                         if wa_handler: 
                             res = wa_handler.send_text(sender, resp['message'])
@@ -342,4 +345,3 @@ def telegram_webhook():
         if tg: tg.send_message(chat_id, resp['message'])
             
     return jsonify({"status": "ok"}), 200
-
