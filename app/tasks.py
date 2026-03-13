@@ -1,63 +1,52 @@
 from celery import shared_task
 from .extensions import db
-from .models import User, Interaction, Course
+from .models import User, Interaction
 from .modules.downloader import download_media
-from .modules.whatsapp_handler import WhatsAppHandler
-from .modules.telegram_handler import TelegramHandler
-from datetime import datetime
-import time
-
-@shared_task(name="tasks.check_scheduled_courses")
-def check_scheduled_courses():
-    """Vérifie les cours à envoyer maintenant."""
-    now = datetime.utcnow()
-    courses = Course.query.filter(Course.scheduled_time <= now, Course.is_sent == False).all()
-    
-    wa = WhatsAppHandler()
-    tg = TelegramHandler()
-    
-    for course in courses:
-        print(f"📅 Envoi du cours programmé : {course.id}")
-        message = f"🎓 *DÉBUT DU COURS PROGRAMMÉ*\n\n{course.content}\n\n_Posez vos questions, je suis là pour y répondre !_"
-        
-        if course.platform == 'whatsapp':
-            wa.send_text(course.target_group, message)
-        elif course.platform == 'telegram':
-            tg.send_message(course.target_group, message)
-            
-        course.is_sent = True
-        db.session.commit()
-    
-    return f"{len(courses)} cours envoyés."
 
 @shared_task(name="tasks.process_download_task")
 def process_download_task(url, user_whatsapp_id):
-    """Téléchargement en arrière-plan pour ne pas bloquer le webhook."""
-    print(f"📥 Début du téléchargement pour {user_whatsapp_id} : {url}")
-    result = download_media(url)
-    
-    if result["status"] == "success":
-        # Ici on appellerait l'API WhatsApp pour envoyer le fichier
-        print(f"✅ Prêt à envoyer : {result['file_path']}")
-    else:
-        print(f"❌ Erreur : {result['message']}")
-    return result
+    """Tâche de téléchargement asynchrone."""
+    print(f"📥 Téléchargement pour {user_whatsapp_id}")
+    return download_media(url)
 
-@shared_task(name="tasks.auto_reply_check")
-def auto_reply_check(user_id):
-    """
-    Vérifie après 2 minutes si l'utilisateur a reçu une réponse.
-    Si l'interaction est toujours 'pending', on envoie une relance.
-    """
-    from .models import Interaction
-    # On attend un peu pour simuler le délai de 2 min dans les tests si nécessaire
-    # Dans la vraie vie, Celery gère le countdown
-    interaction = Interaction.query.filter_by(user_id=user_id, status='pending').order_by(Interaction.timestamp.desc()).first()
+@shared_task(name="tasks.auto_reply_task")
+def auto_reply_task(user_id, platform_id, original_msg, platform):
+    """Vérifie si l'utilisateur a répondu, sinon envoie une réponse auto après 3 min."""
+    from .models import Interaction, User
+    from .modules.ai_handler import AIHandler
+    from .modules.whatsapp_handler import WhatsAppHandler
+    from .modules.telegram_handler import TelegramHandler
+    import time
+
+    # On attend 3 minutes (180 secondes)
+    # Note: Dans un environnement réel, on utiliserait Celery countdown, mais ici on simule
     
-    if interaction:
-        print(f"🤖 Relance automatique pour l'utilisateur {user_id}")
-        interaction.status = 'auto_replied'
+    # Vérifier si une nouvelle interaction a eu lieu depuis le message original
+    # On cherche s'il y a eu un message de l'utilisateur (last_message != original_msg)
+    # ou si le statut est passé à 'replied'
+    user = User.query.get(user_id)
+    if not user: return "User not found"
+
+    # On récupère la dernière interaction
+    last_int = Interaction.query.filter_by(user_id=user_id).order_by(Interaction.timestamp.desc()).first()
+    
+    if last_int and last_int.status == 'pending':
+        # L'utilisateur n'a pas encore eu de réponse de Laure ou n'a pas relancé
+        ai = AIHandler()
+        wa = WhatsAppHandler()
+        tg = TelegramHandler()
+
+        # Générer une réponse basée sur l'humeur et le message
+        prompt = f"L'utilisateur a envoyé : '{original_msg}'. Il n'a pas répondu depuis 3 minutes. Envoie une relance amicale, drôle ou intrigante en fonction de son message pour le faire revenir discuter. Sois Laure."
+        reply = ai.generate_text(prompt)
+
+        if platform == 'whatsapp':
+            wa.send_text(platform_id, f"✨ *RELANCE AUTOMATIQUE* ✨\n\n{reply}")
+        elif platform == 'telegram':
+            tg.send_message(platform_id, f"✨ *RELANCE AUTOMATIQUE* ✨\n\n{reply}")
+        
+        last_int.status = 'auto_replied'
         db.session.commit()
-        return "Relance envoyée"
-    return "Déjà traité"
-
+        return "Auto-réponse envoyée"
+    
+    return "L'utilisateur a déjà répondu ou a été servi"
