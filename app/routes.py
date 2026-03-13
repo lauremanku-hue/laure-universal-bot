@@ -1,4 +1,6 @@
 import os
+import json
+import random
 from flask import Blueprint, request, jsonify, make_response
 from datetime import datetime, timedelta
 
@@ -32,17 +34,80 @@ except Exception as e:
     tg = None
     wa_handler = None
 
+def handle_wizard(user, msg, msg_clean):
+    """Gère les étapes de configuration d'un cours automatique."""
+    state = user.current_state
+    data = json.loads(user.state_data) if user.state_data else {}
+
+    if state == 'awaiting_course_content':
+        data['content'] = msg
+        user.state_data = json.dumps(data)
+        user.current_state = 'awaiting_course_group'
+        db.session.commit()
+        return {"message": "✅ Contenu reçu !\n\nÉtape 2 : Quel est le *nom exact* du groupe ou du canal où je dois poster ce cours ?"}
+
+    elif state == 'awaiting_course_group':
+        data['group'] = msg
+        user.state_data = json.dumps(data)
+        user.current_state = 'awaiting_course_time'
+        db.session.commit()
+        return {"message": "✅ Groupe enregistré !\n\nÉtape 3 : À quelle *heure* dois-je l'envoyer ? (Format HH:MM, ex: 14:30)"}
+
+    elif state == 'awaiting_course_time':
+        try:
+            # Validation sommaire de l'heure
+            time_parts = msg.split(':')
+            if len(time_parts) != 2: raise ValueError()
+            
+            # Création du cours dans la DB
+            new_course = Course(
+                user_id=user.id,
+                content=data['content'],
+                target_group=data['group'],
+                scheduled_time=datetime.utcnow() + timedelta(hours=1), # Simplification pour le test
+                platform=user.platform
+            )
+            db.session.add(new_course)
+            
+            # Reset de l'état
+            user.current_state = 'idle'
+            user.state_data = None
+            db.session.commit()
+            
+            return {"message": f"🎉 *CONFIGURATION TERMINÉE !* 🎉\n\nLe cours sur '{data['content'][:20]}...' sera envoyé dans le groupe *{data['group']}*.\n\nJe répondrai aussi aux questions des membres à la fin du cours !"}
+        except:
+            return {"message": "❌ Format d'heure invalide. Réessaie (ex: 14:30) ou tape 'annuler'."}
+    
+    if msg_clean == 'annuler':
+        user.current_state = 'idle'
+        user.state_data = None
+        db.session.commit()
+        return {"message": "Configuration annulée."}
+
+    return {"message": "Je n'ai pas compris. Tape 'annuler' pour recommencer."}
+
 def process_command(user, msg, platform):
     """Cerveau du bot : traite les messages et décide de la réponse."""
+    # Nettoyage des préfixes courants (ex: /Laure, Laure,)
     msg_clean = msg.strip().lower()
+    prefixes = ['/laure ', 'laure ', 'laure, ', '/laure, ']
+    for pref in prefixes:
+        if msg_clean.startswith(pref):
+            msg_clean = msg_clean.replace(pref, '', 1)
+            break
+            
     print(f"🛠️ Debug Command: user={user.platform_id}, msg='{msg}', clean='{msg_clean}', is_premium={user.is_premium}")
     
+    # 0. GESTION DU GUIDE DE CONFIGURATION (WIZARD)
+    if user.current_state != 'idle':
+        return handle_wizard(user, msg, msg_clean)
+
     # 1. COMMANDES DE BASE (Toujours accessibles)
     is_base_command = msg_clean in [
         'aide', 'menu', '/start', '/menu', 'laure', 
         '/profil', 'profil', 'statut', 'mon profil', 
-        '/pay', 'cadeau', '/cadeau'
-    ] or msg_clean.startswith('/pay ')
+        '/pay', 'cadeau', '/cadeau', '/de', '/blague', '/fun'
+    ] or msg_clean.startswith('/pay ') or msg_clean.startswith('/dl ')
 
     # 2. BLOCAGE SI ESSAI TERMINÉ
     if not user.is_premium and not is_base_command:
@@ -61,6 +126,56 @@ def process_command(user, msg, platform):
     if not user.is_premium_member and user.trial_days_left == 1:
         warning = "\n\n⚠️ *RAPPEL* : Ton essai gratuit se termine dans moins de 24h ! Tape /pay pour ne pas être déconnecté."
 
+    # --- NOUVELLES COMMANDES SLASH ---
+
+    # JEU DE DÉ
+    if msg_clean == '/de':
+        result = random.randint(1, 6)
+        faces = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
+        return {"message": f"🎲 *LANCER DE DÉ* 🎲\n\nLe dé s'arrête sur... *{result}* {faces[result-1]} !"}
+
+    # BLAGUES
+    elif msg_clean in ['/blague', 'blague']:
+        if ai:
+            res = ai.generate_text("Raconte une blague courte et drôle en français.")
+            return {"message": f"😂 *LAURE RIGOLE* 😂\n\n{res}"}
+        return {"message": "Je n'ai pas de blague en tête pour le moment !"}
+
+    # CULTURE GÉNÉRALE TERRE
+    elif msg_clean in ['/terre', 'terre', 'planète']:
+        if ai:
+            res = ai.generate_text("Donne un fait incroyable et éducatif sur la planète Terre.")
+            return {"message": f"🌍 *NOTRE PLANÈTE* 🌍\n\n{res}"}
+        return {"message": "La Terre est ronde, c'est tout ce que je sais pour l'instant !"}
+
+    # TÉLÉCHARGEMENT VIDÉO
+    elif msg_clean.startswith('/dl '):
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*\n\nLe téléchargement est réservé aux VIP. Tape /pay !"}
+        url = msg.split(' ')[1]
+        if validate_url(url):
+            process_download_task.delay(url, user.platform_id)
+            return {"message": "📥 *TÉLÉCHARGEMENT* 📥\n\nLien reçu ! Je prépare ta vidéo..."}
+        return {"message": "❌ Lien invalide."}
+
+    # COURS RAPIDE
+    elif msg_clean.startswith('/cours ') or msg_clean.startswith('/cour '):
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        sujet = msg.split(' ', 1)[1]
+        if ai:
+            res = ai.generate_text(f"Donne un cours structuré, pédagogique et complet sur : {sujet}. Utilise des emojis.")
+            return {"message": f"🎓 *COURS SUR {sujet.upper()}* 🎓\n\n{res}"}
+        return {"message": "Je ne peux pas donner de cours pour le moment."}
+
+    # CONFIGURATION COURS AUTOMATIQUE (WIZARD)
+    elif msg_clean == '/config_cours':
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        user.current_state = 'awaiting_course_content'
+        db.session.commit()
+        return {"message": "📝 *CONFIGURATION COURS AUTO* 📝\n\nÉtape 1 : Quel est le *sujet* ou le *contenu* du cours que tu veux programmer ?"}
+
     # 1. MENU & AIDE
     if msg_clean in ['aide', 'menu', '/start', '/menu', 'laure']:
         if user.is_premium:
@@ -70,10 +185,11 @@ def process_command(user, msg, platform):
                 "✨ *TES PRIVILÈGES :*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "🧠 *IA Illimitée* : Pose toutes tes questions sans fin.\n"
-                "🎨 *Création d'Images* : Tape `/img ton idée` (Illimité)\n"
-                "📥 *Téléchargements* : Envoie n'importe quel lien (YouTube, TikTok, etc.)\n"
-                "🎓 *Cours* : Tape `/cours` pour apprendre\n"
-                "🎭 *Divertissement* : Tape `/fun` pour t'amuser\n"
+                "🎨 *Images* : Tape `/img ton idée` (Illimité)\n"
+                "📥 *Téléchargements* : Tape `/dl [lien]`\n"
+                "🎓 *Cours Express* : Tape `/cours [sujet]`\n"
+                "📅 *Programmer Cours* : Tape `/config_cours`\n"
+                "🎭 *Fun* : `/blague`, `/quiz`, `/de`, `/terre`\n"
                 "👤 *Statut* : Tape `statut` pour voir tes infos\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "📢 *PARTAGE LAURE* : Aide tes amis à découvrir Laure !"
@@ -86,10 +202,10 @@ def process_command(user, msg, platform):
                 "💡 *CE QUE JE PEUX FAIRE POUR TOI :*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "🧠 *Répondre à tout* : Pose-moi n'importe quelle question !\n"
-                "🎨 *Créer des images* : Tape `/img ton idée` (Réservé VIP 💎)\n"
-                "📥 *Télécharger* : Envoie un lien (Réservé VIP 💎)\n"
-                "🎓 *Cours* : Tape `/cours` (Réservé VIP 💎)\n"
-                "🎭 *Divertissement* : Tape `/fun` pour blagues et jeux\n"
+                "🎨 *Images* : Tape `/img ton idée` (VIP 💎)\n"
+                "📥 *Télécharger* : Tape `/dl [lien]` (VIP 💎)\n"
+                "🎓 *Cours* : Tape `/cours [sujet]` (VIP 💎)\n"
+                "🎭 *Divertissement* : `/blague`, `/de`, `/terre`\n"
                 "👤 *Mon Profil* : Tape `statut` pour voir tes bonus\n"
                 "💎 *Devenir VIP* : Tape `/pay` pour l'illimité + 500 Mo offerts !\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
@@ -244,8 +360,17 @@ def process_command(user, msg, platform):
     # 5. IA UNIVERSELLE (Répond à tout le reste)
     else:
         if ai:
-            # On demande à l'IA de répondre de manière pédagogique et amicale
-            response = ai.generate_text(f"Réponds en tant que Laure, une assistante IA intelligente et amicale. Question de l'utilisateur : {msg}")
+            # Vérifier s'il y a un cours récent envoyé par cet utilisateur ou pour cet utilisateur
+            recent_course = Course.query.filter_by(user_id=user.id, is_sent=True).order_by(Course.scheduled_time.desc()).first()
+            context = ""
+            if recent_course:
+                # Si le cours a été envoyé il y a moins de 2 heures, on l'utilise comme contexte
+                from datetime import datetime
+                if (datetime.utcnow() - recent_course.scheduled_time).total_seconds() < 7200:
+                    context = f"Tu viens de donner un cours sur : {recent_course.content[:500]}... Utilise ce contexte pour répondre si la question porte sur le cours."
+
+            prompt = f"Réponds en tant que Laure, une assistante IA intelligente et amicale. {context} Question de l'utilisateur : {msg}"
+            response = ai.generate_text(prompt)
             return {"message": response + warning}
         return {"message": f"🤖 Laure a bien reçu : \"{msg}\". Tapez /menu pour voir mes options !" + warning}
 
