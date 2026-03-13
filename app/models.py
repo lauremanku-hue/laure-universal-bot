@@ -1,6 +1,6 @@
 import os
 from .extensions import db
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class User(db.Model):
     __tablename__ = 'laure_user'
@@ -27,7 +27,7 @@ class User(db.Model):
     def is_premium(self):
         # 1. Liste des numéros Admin (Hardcoded + Env Var)
         # On ajoute les numéros que tu as fournis pour être sûr
-        admins = ["237659867487", "237686683246", "2376697236373", "659867487", "686683246", "6697236373"]
+        admins = ["237659867487", "237686683246", "237697236373", "659867487", "686683246", "697236373"]
         
         # Ajout des numéros depuis les variables d'environnement
         env_admins = os.getenv("ADMIN_NUMBERS", "").split(",")
