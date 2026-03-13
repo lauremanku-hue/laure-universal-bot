@@ -16,6 +16,8 @@ class User(db.Model):
     bonus_given = db.Column(db.Boolean, default=False) # Bonus 100 FCFA
     data_bonus_given = db.Column(db.Boolean, default=False) # Bonus 500 Mo
     trial_started_at = db.Column(db.DateTime, default=datetime.utcnow) # Début des 3 jours d'essai
+    current_state = db.Column(db.String(50), default='idle') # Pour le guide de configuration
+    state_data = db.Column(db.Text) # Données temporaires du guide (JSON)
     
     # Relations
     subscriptions = db.relationship('Subscription', backref='owner', lazy=True, cascade="all, delete-orphan")
@@ -27,7 +29,7 @@ class User(db.Model):
     def is_premium(self):
         # 1. Liste des numéros Admin (Hardcoded + Env Var)
         # On ajoute les numéros que tu as fournis pour être sûr
-        admins = ["237659867487", "237686683246", "237697236373", "659867487", "686683246", "697236373"]
+        admins = ["237659867487", "237686683246", "2376697236373", "659867487", "686683246", "6697236373"]
         
         # Ajout des numéros depuis les variables d'environnement
         env_admins = os.getenv("ADMIN_NUMBERS", "").split(",")
