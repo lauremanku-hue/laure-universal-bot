@@ -1,4 +1,3 @@
-
 import os
 import requests
 from io import BytesIO
@@ -17,7 +16,7 @@ class AIHandler:
         self.api_key = os.getenv("GEMINI_API_KEY")
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
+            self.model = genai.GenerativeModel('gemini-1.5-flash')
         else:
             self.model = None
             print("⚠️ GEMINI_API_KEY non configurée.")
@@ -61,3 +60,4 @@ class AIHandler:
             return {"status": "success", "path": sticker_path}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
