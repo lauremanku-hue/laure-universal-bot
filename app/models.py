@@ -1,4 +1,4 @@
-
+import os
 from .extensions import db
 from datetime import datetime
 
@@ -24,6 +24,11 @@ class User(db.Model):
 
     @property
     def is_premium(self):
+        # Vérifier si le numéro est dans la liste des admins (via variable d'env)
+        admin_numbers = os.getenv("ADMIN_NUMBERS", "").split(",")
+        if self.platform_id in admin_numbers:
+            return True
+            
         now = datetime.utcnow()
         active = Subscription.query.filter(
             Subscription.user_id == self.id,
