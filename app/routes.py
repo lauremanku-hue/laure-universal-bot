@@ -1,3 +1,4 @@
+
 import os
 from flask import Blueprint, request, jsonify, make_response
 from datetime import datetime, timedelta
@@ -46,21 +47,37 @@ def process_command(user, msg, platform):
 
     # 1. MENU & AIDE
     if msg_clean in ['aide', 'menu', '/start', '/menu', 'laure']:
-        menu_text = (
-            "🚀 *LAURE - TON ASSISTANTE IA TOUT-EN-UN* 🚀\n\n"
-            "Salut ! Je suis Laure. Je suis là pour t'aider à apprendre, créer et t'amuser ! ✨\n\n"
-            "💡 *CE QUE JE PEUX FAIRE POUR TOI :*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🧠 *Répondre à tout* : Pose-moi n'importe quelle question !\n"
-            "🎨 *Créer des images* : Tape `/img ton idée` (ex: /img un lion en costume)\n"
-            "📥 *Télécharger* : Envoie-moi un lien YouTube/FB/TikTok/IG\n"
-            "👤 *Mon Profil* : Tape `/profil` ou `statut` pour voir tes bonus\n"
-            "🎁 *Gagner* : Tape `/cadeau` pour parrainer\n"
-            "💎 *Devenir VIP* : Tape `/pay` pour l'illimité + 500 Mo offerts !\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📢 *PARTAGE LAURE* : Transfère ce message à tes amis pour les aider aussi !"
-            f"{contact_info}"
-        )
+        if user.is_premium:
+            menu_text = (
+                "💎 *MENU VIP LAURE* 💎\n\n"
+                "Félicitations ! Tu es un membre **VIP**. Profite de toute ma puissance sans limites ! 🚀\n\n"
+                "✨ *TES PRIVILÈGES :*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "🧠 *IA Illimitée* : Pose toutes tes questions sans fin.\n"
+                "🎨 *Création d'Images* : Tape `/img ton idée` (Illimité)\n"
+                "📥 *Téléchargements* : Envoie n'importe quel lien (YouTube, TikTok, etc.)\n"
+                "👤 *Statut* : Tape `statut` pour voir tes infos\n"
+                "🎁 *Parrainage* : Tape `/cadeau` pour inviter tes amis\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "📢 *PARTAGE LAURE* : Aide tes amis à découvrir Laure !"
+                f"{contact_info}"
+            )
+        else:
+            menu_text = (
+                "🚀 *LAURE - TON ASSISTANTE IA TOUT-EN-UN* 🚀\n\n"
+                "Salut ! Je suis Laure. Je suis là pour t'aider à apprendre, créer et t'amuser ! ✨\n\n"
+                "💡 *CE QUE JE PEUX FAIRE POUR TOI :*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "🧠 *Répondre à tout* : Pose-moi n'importe quelle question !\n"
+                "🎨 *Créer des images* : Tape `/img ton idée` (Réservé VIP 💎)\n"
+                "📥 *Télécharger* : Envoie un lien (Réservé VIP 💎)\n"
+                "👤 *Mon Profil* : Tape `statut` pour voir tes bonus\n"
+                "🎁 *Gagner* : Tape `/cadeau` pour parrainer\n"
+                "💎 *Devenir VIP* : Tape `/pay` pour l'illimité + 500 Mo offerts !\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "📢 *PARTAGE LAURE* : Transfère ce message à tes amis !"
+                f"{contact_info}"
+            )
         return {"message": menu_text}
 
     # 1.1 COMMANDE PROFIL / STATUT
@@ -69,10 +86,14 @@ def process_command(user, msg, platform):
         bonus_status = "✅ Reçu (100 FCFA)" if user.bonus_given else "❌ Non reçu"
         data_status = "✅ Envoyé (500 Mo)" if user.data_bonus_given else "⏳ En attente (Abonne-toi !)"
         
+        trial_info = ""
+        if user.trial_days_left > 0:
+            trial_info = f"\n🎁 *Essai VIP* : {user.trial_days_left} jour(s) restant(s)"
+        
         profil_text = (
             "👤 *TON PROFIL LAURE* 👤\n\n"
             f"🆔 *ID* : `{user.platform_id}`\n"
-            f"🌟 *Statut* : {status}\n"
+            f"🌟 *Statut* : {status}{trial_info}\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"💰 *Bonus Bienvenue* : {bonus_status}\n"
             f"📡 *Bonus Data* : {data_status}\n"
@@ -126,9 +147,27 @@ def process_command(user, msg, platform):
             "3️⃣ *1 MOIS* : 1500 FCFA\n"
             "👉 Tape `/pay 3` pour ce plan\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎁 *BONUS* : 500 Mo de DATA offerts pour chaque abonnement !"
+            "🎁 *BONUS* : 500 Mo de DATA offerts pour chaque abonnement !\n\n"
+            "⚠️ _Note : Après tes 3 jours d'essai, tu devras t'abonner pour continuer à utiliser ces services._"
         )
         return {"message": plans_text}
+
+    # 2.5 COURS (Premium Check)
+    elif msg_clean in ['/cours', 'cours', 'apprendre']:
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*\n\nLes cours interactifs sont réservés aux membres VIP. Tapez */pay* pour vous abonner !"}
+        
+        cours_text = (
+            "🎓 *ACADÉMIE LAURE* 🎓\n\n"
+            "Que souhaites-tu apprendre aujourd'hui ?\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "1️⃣ *Informatique* (Python, Web, IA)\n"
+            "2️⃣ *Langues* (Anglais, Espagnol)\n"
+            "3️⃣ *Business* (Marketing, Vente)\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "👉 _Dis-moi simplement : 'Laure, je veux un cours sur [sujet]'_"
+        )
+        return {"message": cours_text}
 
     elif msg_clean.startswith('/pay '):
         choice = msg_clean.split(' ')[1]
@@ -215,7 +254,13 @@ def whatsapp_webhook():
                             user = User(platform='whatsapp', platform_id=sender, name="Utilisateur WA", bonus_given=True)
                             db.session.add(user)
                             db.session.commit()
-                            welcome_msg = "🌟 *BIENVENUE CHEZ LAURE !* 🌟\n\nMerci de m'avoir contactée ! Tu as reçu un *bonus de 100 FCFA* pour tester mes services.\n\nTape *menu* pour voir tout ce que je peux faire pour toi !"
+                            welcome_msg = (
+                                "🌟 *BIENVENUE CHEZ LAURE !* 🌟\n\n"
+                                "Merci de m'avoir contactée ! Tu as reçu un *bonus de 100 FCFA* pour tester mes services.\n\n"
+                                "🎁 *OFFRE SPÉCIALE* : Je t'offre **3 JOURS d'accès VIP GRATUIT** ! 🎉\n"
+                                "Profite des images IA, des téléchargements et des cours dès maintenant.\n\n"
+                                "Tape *menu* pour voir tout ce que je peux faire pour toi !"
+                            )
                             if wa_handler: 
                                 res = wa_handler.send_text(sender, welcome_msg)
                                 print(f"📤 Réponse bienvenue envoyée : {res}")
