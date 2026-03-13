@@ -1,4 +1,3 @@
-
 import os
 from flask import Blueprint, request, jsonify, make_response
 from datetime import datetime, timedelta
@@ -41,7 +40,7 @@ def process_command(user, msg, platform):
     db.session.commit()
 
     # Infos de contact
-    contact_info = "\n\n📧 Contact : laure.support@example.com\n📱 WhatsApp : +237 6659867487/686683246"
+    contact_info = "\n\n📧 Contact : laure.support@example.com\n📱 WhatsApp : +229 00000000"
 
     # 1. MENU & AIDE
     if msg.lower() in ['aide', 'menu', '/start', '/menu']:
@@ -53,7 +52,8 @@ def process_command(user, msg, platform):
             "🧠 *Répondre à tout* : Pose-moi n'importe quelle question !\n"
             "🎨 *Créer des images* : Tape `/img ton idée` (ex: /img un lion en costume)\n"
             "📥 *Télécharger* : Envoie-moi un lien YouTube/FB/TikTok/IG\n"
-            "🎁 *Gagner* : Tape `/cadeau` pour voir tes bonus\n"
+            "👤 *Mon Profil* : Tape `/profil` pour voir tes bonus\n"
+            "🎁 *Gagner* : Tape `/cadeau` pour parrainer\n"
             "💎 *Devenir VIP* : Tape `/pay` pour l'illimité + 500 Mo offerts !\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📢 *PARTAGE LAURE* : Transfère ce message à tes amis pour les aider aussi !"
@@ -61,9 +61,28 @@ def process_command(user, msg, platform):
         )
         return {"message": menu_text}
 
-    # 1.1 COMMANDE CADEAU / PARRAINAGE
+    # 1.1 COMMANDE PROFIL
+    elif msg.lower() == '/profil':
+        status = "💎 PREMIUM (Illimité)" if user.is_premium else "🆓 GRATUIT (Limité)"
+        bonus_status = "✅ Reçu (100 FCFA)" if user.bonus_given else "❌ Non reçu"
+        data_status = "✅ Envoyé (500 Mo)" if user.data_bonus_given else "⏳ En attente (Abonne-toi !)"
+        
+        profil_text = (
+            "👤 *TON PROFIL LAURE* 👤\n\n"
+            f"🆔 *ID* : `{user.platform_id}`\n"
+            f"🌟 *Statut* : {status}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *Bonus Bienvenue* : {bonus_status}\n"
+            f"📡 *Bonus Data* : {data_status}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Tape /pay pour passer en Premium et débloquer toutes les fonctionnalités !_"
+        )
+        return {"message": profil_text}
+
+    # 1.2 COMMANDE CADEAU / PARRAINAGE
     elif msg.lower() == '/cadeau':
-        referral_link = f"https://wa.me/923436404197048?text=Menu" # On utilise le numéro Meta
+        bot_number = os.getenv("PHONE_NUMBER_ID", "923436404197048") # Valeur par défaut si non trouvé
+        referral_link = f"https://wa.me/{bot_number}?text=Menu"
         gift_text = (
             "🎁 *TES CADEAUX LAURE* 🎁\n\n"
             "✅ *Bonus de bienvenue* : 100 FCFA déjà crédités !\n"
@@ -193,6 +212,8 @@ def whatsapp_webhook():
                         msg = value['messages'][0]
                         sender = msg['from']
                         text = msg.get('text', {}).get('body', '')
+                        
+                        print(f"📩 Message reçu de {sender} : {text}")
 
                         user = User.query.filter_by(platform='whatsapp', platform_id=sender).first()
                         if not user:
@@ -324,4 +345,3 @@ def telegram_webhook():
         if tg: tg.send_message(chat_id, resp['message'])
             
     return jsonify({"status": "ok"}), 200
-
