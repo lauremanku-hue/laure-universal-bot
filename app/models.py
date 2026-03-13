@@ -15,6 +15,7 @@ class User(db.Model):
     is_premium_member = db.Column(db.Boolean, default=False)
     bonus_given = db.Column(db.Boolean, default=False) # Bonus 100 FCFA
     data_bonus_given = db.Column(db.Boolean, default=False) # Bonus 500 Mo
+    trial_started_at = db.Column(db.DateTime, default=datetime.utcnow) # Début des 3 jours d'essai
     
     # Relations
     subscriptions = db.relationship('Subscription', backref='owner', lazy=True, cascade="all, delete-orphan")
@@ -24,18 +25,36 @@ class User(db.Model):
 
     @property
     def is_premium(self):
-        # Vérifier si le numéro est dans la liste des admins (via variable d'env)
+        # 1. Vérifier si admin
         admin_numbers = os.getenv("ADMIN_NUMBERS", "").split(",")
         if self.platform_id in admin_numbers:
             return True
             
         now = datetime.utcnow()
+        
+        # 2. Vérifier la période d'essai de 3 jours
+        if self.trial_started_at:
+            trial_end = self.trial_started_at + timedelta(days=3)
+            if now < trial_end:
+                return True
+
+        # 3. Vérifier les abonnements actifs
         active = Subscription.query.filter(
             Subscription.user_id == self.id,
             Subscription.end_date > now,
             Subscription.status == 'active'
         ).first()
+        
         return (active is not None) or self.is_premium_member
+
+    @property
+    def trial_days_left(self):
+        if not self.trial_started_at:
+            return 0
+        now = datetime.utcnow()
+        trial_end = self.trial_started_at + timedelta(days=3)
+        delta = trial_end - now
+        return max(0, delta.days + (1 if delta.seconds > 0 else 0))
 
 class Subscription(db.Model):
     __tablename__ = 'laure_subscription'
