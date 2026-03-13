@@ -25,20 +25,29 @@ class User(db.Model):
 
     @property
     def is_premium(self):
-        # 1. Vérifier si admin
-        admin_numbers = os.getenv("ADMIN_NUMBERS", "").split(",")
-        if self.platform_id in admin_numbers:
+        # 1. Liste des numéros Admin (Hardcoded + Env Var)
+        # On ajoute les numéros que tu as fournis pour être sûr
+        admins = ["237659867487", "237686683246", "2376697236373", "659867487", "686683246", "6697236373"]
+        
+        # Ajout des numéros depuis les variables d'environnement
+        env_admins = os.getenv("ADMIN_NUMBERS", "").split(",")
+        admins.extend([a.strip() for a in env_admins if a.strip()])
+        
+        if self.platform_id in admins:
             return True
             
         now = datetime.utcnow()
         
         # 2. Vérifier la période d'essai de 3 jours
-        if self.trial_started_at:
-            trial_end = self.trial_started_at + timedelta(days=3)
-            if now < trial_end:
-                return True
+        # Si trial_started_at est nul (ancien utilisateur), on lui donne 3 jours à partir de maintenant
+        if not self.trial_started_at:
+            return True # On considère qu'il est en essai s'il n'a pas de date (sera fixé au prochain commit)
+            
+        trial_end = self.trial_started_at + timedelta(days=3)
+        if now < trial_end:
+            return True
 
-        # 3. Vérifier les abonnements actifs
+        # 3. Vérifier les abonnements actifs (VIP payant)
         active = Subscription.query.filter(
             Subscription.user_id == self.id,
             Subscription.end_date > now,
