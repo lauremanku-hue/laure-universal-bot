@@ -182,31 +182,23 @@ def whatsapp_webhook():
         token_recu = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
         token_attendu = os.getenv("VERIFY_TOKEN", "laure_secret")
+        
+        print(f"🔍 Tentative de vérification Webhook : mode={mode}, token={token_recu}")
+        
         if mode == "subscribe" and token_recu == token_attendu:
+            print("✅ Webhook vérifié avec succès !")
             return make_response(str(challenge), 200)
+        
+        print("❌ Échec de la vérification Webhook (Token invalide)")
         return "Forbidden", 403
 
     data = request.json
+    # print(f"📦 Payload reçu : {data}") # Optionnel : très verbeux
     try:
         if data and 'entry' in data:
             for entry in data['entry']:
-                # Gestion Messenger / Instagram
-                if 'messaging' in entry:
-                    for messaging_event in entry['messaging']:
-                        sender_id = messaging_event['sender']['id']
-                        if 'message' in messaging_event and 'text' in messaging_event['message']:
-                            text = messaging_event['message']['text']
-                            platform = 'instagram' if 'instagram' in str(entry).lower() else 'messenger'
-                            user = User.query.filter_by(platform=platform, platform_id=sender_id).first()
-                            if not user:
-                                user = User(platform=platform, platform_id=sender_id, name=f"User {platform.capitalize()}", bonus_given=True)
-                                db.session.add(user)
-                                db.session.commit()
-                            resp = process_command(user, text, platform)
-                            # Envoi réponse (à implémenter selon MetaHandler)
-                
                 # Gestion WhatsApp
-                elif 'changes' in entry:
+                if 'changes' in entry:
                     value = entry['changes'][0]['value']
                     if 'messages' in value:
                         msg = value['messages'][0]
@@ -217,14 +209,19 @@ def whatsapp_webhook():
 
                         user = User.query.filter_by(platform='whatsapp', platform_id=sender).first()
                         if not user:
+                            print(f"🆕 Nouvel utilisateur WhatsApp : {sender}")
                             user = User(platform='whatsapp', platform_id=sender, name="Utilisateur WA", bonus_given=True)
                             db.session.add(user)
                             db.session.commit()
                             welcome_msg = "🌟 *BIENVENUE CHEZ LAURE !* 🌟\n\nMerci de m'avoir contactée ! Tu as reçu un *bonus de 100 FCFA* pour tester mes services.\n\nTape *menu* pour voir tout ce que je peux faire pour toi !"
-                            if wa_handler: wa_handler.send_text(sender, welcome_msg)
+                            if wa_handler: 
+                                res = wa_handler.send_text(sender, welcome_msg)
+                                print(f"📤 Réponse bienvenue envoyée : {res}")
 
                         resp = process_command(user, text, 'whatsapp')
-                        if wa_handler: wa_handler.send_text(sender, resp['message'])
+                        if wa_handler: 
+                            res = wa_handler.send_text(sender, resp['message'])
+                            print(f"📤 Réponse commande envoyée : {res}")
     except Exception as e:
         print(f"❌ Erreur Webhook Meta: {e}")
 
