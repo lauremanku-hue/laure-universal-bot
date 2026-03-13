@@ -10,7 +10,7 @@ from .modules.ai_handler import AIHandler
 from .modules.telegram_handler import TelegramHandler
 from .modules.whatsapp_handler import WhatsAppHandler
 from .modules.downloader import validate_url
-from .tasks import process_download_task
+from .tasks import process_download_task, auto_reply_task
 
 main = Blueprint('main', __name__)
 
@@ -176,6 +176,18 @@ def process_command(user, msg, platform):
         db.session.commit()
         return {"message": "📝 *CONFIGURATION COURS AUTO* 📝\n\nÉtape 1 : Quel est le *sujet* ou le *contenu* du cours que tu veux programmer ?"}
 
+    # TÉLÉCHARGEMENT AUTO (Vues uniques / Médias groupes)
+    elif msg_clean == '/dl_auto':
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        return {"message": "🔄 *MODE TÉLÉCHARGEMENT AUTO* 🔄\n\nActivé ! Laure va maintenant tenter de capturer automatiquement tous les médias (y compris les vues uniques) dans les groupes où elle est *ADMIN*."}
+
+    # TÉLÉCHARGEMENT STATUTS
+    elif msg_clean == '/status':
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        return {"message": "📲 *TÉLÉCHARGEMENT STATUTS* 📲\n\nEnvoie-moi le lien du statut ou le contact dont tu veux capturer le statut (WhatsApp, FB, Telegram). Laure s'en occupe !"}
+
     # 1. MENU & AIDE
     if msg_clean in ['aide', 'menu', '/start', '/menu', 'laure']:
         if user.is_premium:
@@ -189,6 +201,8 @@ def process_command(user, msg, platform):
                 "📥 *Téléchargements* : Tape `/dl [lien]`\n"
                 "🎓 *Cours Express* : Tape `/cours [sujet]`\n"
                 "📅 *Programmer Cours* : Tape `/config_cours`\n"
+                "📥 *Auto-DL* : Tape `/dl_auto` (Vues uniques)\n"
+                "📲 *Statuts* : Tape `/status` (WA, FB, TG)\n"
                 "🎭 *Fun* : `/blague`, `/quiz`, `/de`, `/terre`\n"
                 "👤 *Statut* : Tape `statut` pour voir tes infos\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
@@ -425,6 +439,10 @@ def whatsapp_webhook():
 
                         print(f"⚙️ Traitement de la commande pour {sender}...")
                         resp = process_command(user, text, 'whatsapp')
+                        
+                        # Déclencher l'auto-réponse après 3 minutes si pas de réponse
+                        auto_reply_task.apply_async(args=[user.id, sender, text, 'whatsapp'], countdown=180)
+                        
                         if wa_handler: 
                             res = wa_handler.send_text(sender, resp['message'])
                             print(f"📤 Réponse commande envoyée : {res}")
@@ -545,6 +563,10 @@ def telegram_webhook():
             if tg: tg.send_message(chat_id, welcome_msg)
 
         resp = process_command(user, text, 'telegram')
+        
+        # Déclencher l'auto-réponse après 3 minutes si pas de réponse
+        auto_reply_task.apply_async(args=[user.id, chat_id, text, 'telegram'], countdown=180)
+        
         if tg: tg.send_message(chat_id, resp['message'])
             
     return jsonify({"status": "ok"}), 200
