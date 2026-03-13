@@ -1,4 +1,3 @@
-
 import os
 from flask import Blueprint, request, jsonify, make_response
 from datetime import datetime, timedelta
@@ -36,7 +35,19 @@ except Exception as e:
 def process_command(user, msg, platform):
     """Cerveau du bot : traite les messages et décide de la réponse."""
     msg_clean = msg.strip().lower()
+    print(f"🛠️ Debug Command: user={user.platform_id}, msg='{msg}', clean='{msg_clean}', is_premium={user.is_premium}")
     
+    # 1. COMMANDES DE BASE (Toujours accessibles)
+    is_base_command = msg_clean in [
+        'aide', 'menu', '/start', '/menu', 'laure', 
+        '/profil', 'profil', 'statut', 'mon profil', 
+        '/pay', 'cadeau', '/cadeau'
+    ] or msg_clean.startswith('/pay ')
+
+    # 2. BLOCAGE SI ESSAI TERMINÉ
+    if not user.is_premium and not is_base_command:
+        return {"message": "🚫 *PÉRIODE D'ESSAI TERMINÉE* 🚫\n\nTes 3 jours d'essai gratuit sont finis. Pour continuer à discuter avec Laure et utiliser toutes ses fonctions, abonne-toi dès maintenant !\n\nTape */pay* pour voir les tarifs."}
+
     # Logique d'interaction
     new_int = Interaction(user_id=user.id, last_message=msg)
     db.session.add(new_int)
@@ -44,6 +55,11 @@ def process_command(user, msg, platform):
 
     # Infos de contact
     contact_info = "\n\n📧 Contact : lauresontia659@gmail.com\n📱 WhatsApp : +237 686683246"
+
+    # Alerte expiration (Notification à l'avance)
+    warning = ""
+    if not user.is_premium_member and user.trial_days_left == 1:
+        warning = "\n\n⚠️ *RAPPEL* : Ton essai gratuit se termine dans moins de 24h ! Tape /pay pour ne pas être déconnecté."
 
     # 1. MENU & AIDE
     if msg_clean in ['aide', 'menu', '/start', '/menu', 'laure']:
@@ -78,7 +94,7 @@ def process_command(user, msg, platform):
                 "📢 *PARTAGE LAURE* : Transfère ce message à tes amis !"
                 f"{contact_info}"
             )
-        return {"message": menu_text}
+        return {"message": menu_text + warning}
 
     # 1.1 COMMANDE PROFIL / STATUT
     elif msg_clean in ['/profil', 'profil', 'statut', 'mon profil']:
@@ -100,7 +116,7 @@ def process_command(user, msg, platform):
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💡 _Tape /pay pour passer en Premium et débloquer toutes les fonctionnalités !_"
         )
-        return {"message": profil_text}
+        return {"message": profil_text + warning}
 
     # 1.2 COMMANDE CADEAU / PARRAINAGE
     elif msg_clean == '/cadeau':
@@ -192,11 +208,11 @@ def process_command(user, msg, platform):
             return {"message": "❌ Plan invalide. Tape `/pay` pour voir les options."}
 
     # 3. IA IMAGE (Premium Check)
-    elif msg_clean.startswith('/img '):
+    elif msg_clean.startswith('/img ') or msg_clean.startswith('img '):
         if not user.is_premium:
             return {"message": "❌ *ACCÈS PREMIUM REQUIS*\n\nCette fonctionnalité est réservée aux abonnés. Tapez */pay* pour activer votre accès !"}
         if ai:
-            prompt = msg.replace('/img ', '').replace('/IMG ', '')
+            prompt = msg.replace('/img ', '').replace('/IMG ', '').replace('img ', '').replace('IMG ', '')
             res = ai.generate_image_from_text(prompt)
             return {"message": f"🎨 Image générée pour : {prompt}\nLien : {res.get('url')}"}
         return {"message": "Moteur d'image indisponible."}
@@ -213,8 +229,8 @@ def process_command(user, msg, platform):
         if ai:
             # On demande à l'IA de répondre de manière pédagogique et amicale
             response = ai.generate_text(f"Réponds en tant que Laure, une assistante IA intelligente et amicale. Question de l'utilisateur : {msg}")
-            return {"message": response}
-        return {"message": f"🤖 Laure a bien reçu : \"{msg}\". Tapez /menu pour voir mes options !"}
+            return {"message": response + warning}
+        return {"message": f"🤖 Laure a bien reçu : \"{msg}\". Tapez /menu pour voir mes options !" + warning}
 
 @main.route('/webhook/meta', methods=['GET', 'POST'])
 def whatsapp_webhook():
