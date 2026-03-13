@@ -17,9 +17,12 @@ class AIHandler:
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                # Utilisation d'un modèle plus récent et stable
-                self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
-                print("✅ Gemini configuré avec succès.")
+                # Utilisation de gemini-1.5-flash qui est très stable et supporte le grounding
+                self.model = genai.GenerativeModel(
+                    model_name='gemini-1.5-flash',
+                    tools=[{'google_search_retrieval': {}}]
+                )
+                print("✅ Gemini 1.5 Flash configuré avec succès (Grounding activé).")
             except Exception as e:
                 self.model = None
                 print(f"❌ Erreur configuration Gemini : {e}")
@@ -28,34 +31,34 @@ class AIHandler:
             print("⚠️ GEMINI_API_KEY non configurée.")
 
     def generate_text(self, prompt):
-        """Génère une réponse textuelle via Gemini."""
+        """Génère une réponse textuelle via Gemini avec recherche web."""
         if not self.model:
             return "Désolé, mon cerveau (IA) n'est pas encore connecté. Contactez l'admin !"
         
         try:
-            # Nettoyage du prompt pour éviter les erreurs de caractères spéciaux
-            safe_prompt = str(prompt).encode('utf-8', 'ignore').decode('utf-8')
-            response = self.model.generate_content(safe_prompt)
+            # On utilise le grounding pour des réponses "exactes et vraies"
+            response = self.model.generate_content(prompt)
             
-            if response and hasattr(response, 'text'):
+            if response and response.text:
                 return response.text
-            elif response and hasattr(response, 'parts'):
-                return "".join([p.text for p in response.parts if hasattr(p, 'text')])
             else:
-                return "Je n'ai pas pu formuler de réponse claire. Peux-tu reformuler ?"
+                # Fallback si le grounding bloque ou si la réponse est vide
+                return "Je n'ai pas trouvé d'information exacte à ce sujet. Peux-tu être plus précis ?"
         except Exception as e:
             error_msg = str(e)
             print(f"❌ Erreur Gemini Text : {error_msg}")
-            if "API_KEY_INVALID" in error_msg:
-                return "⚠️ Erreur technique : La clé API de l'IA est invalide. Contactez l'admin."
-            elif "quota" in error_msg.lower():
+            if "quota" in error_msg.lower():
                 return "⏳ Je suis un peu fatiguée (quota atteint). Réessaie dans quelques minutes !"
             return "Oups, j'ai eu un petit bug en réfléchissant. Réessaie plus tard !"
 
     def generate_image_from_text(self, prompt):
-        """Simule la génération d'une image via IA."""
+        """Génère une image via l'IA (Simulation améliorée ou API réelle si possible)."""
         print(f"🎨 Requête d'image : {prompt}")
-        return {"status": "success", "url": f"https://picsum.photos/seed/{prompt.replace(' ', '_')}/512/512"}
+        # En attendant une intégration Imagen complète, on utilise un service de génération plus performant
+        # On utilise Pollinations.ai qui génère de vraies images correspondant au prompt
+        encoded_prompt = prompt.replace(' ', '%20')
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+        return {"status": "success", "url": image_url}
 
     def create_sticker_from_image(self, image_url_or_path, is_from_net=True):
         if not HAS_PILLOW:
