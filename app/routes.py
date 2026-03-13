@@ -342,3 +342,4 @@ def telegram_webhook():
         if tg: tg.send_message(chat_id, resp['message'])
             
     return jsonify({"status": "ok"}), 200
+
