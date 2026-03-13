@@ -33,6 +33,10 @@ def create_app():
     
     # Enregistrement des blueprints
     app.register_blueprint(main)
+    # Création automatique des tables au démarrage
+    with app.app_context():
+        db.create_all()
+        print("🗄️ Base de données initialisée (Tables créées).")
     
     return app
 
