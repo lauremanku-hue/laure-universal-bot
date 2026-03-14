@@ -1,7 +1,7 @@
 import os
 import json
 import random
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify, make_response, current_app
 from datetime import datetime, timedelta
 
 from .extensions import db
@@ -10,7 +10,7 @@ from .modules.ai_handler import AIHandler
 from .modules.telegram_handler import TelegramHandler
 from .modules.whatsapp_handler import WhatsAppHandler
 from .modules.downloader import validate_url
-from .tasks import process_download_task, auto_reply_task
+from .tasks import process_download_task, schedule_auto_reply
 
 main = Blueprint('main', __name__)
 
@@ -154,7 +154,13 @@ def process_command(user, msg, platform):
             return {"message": "❌ *ACCÈS PREMIUM REQUIS*\n\nLe téléchargement est réservé aux VIP. Tape /pay !"}
         url = msg.split(' ')[1]
         if validate_url(url):
-            process_download_task.delay(url, user.platform_id)
+            try:
+                process_download_task.delay(url, user.platform_id)
+            except:
+                # Fallback si Redis est mort
+                from .modules.downloader import download_media
+                import threading
+                threading.Thread(target=download_media, args=(url,)).start()
             return {"message": "📥 *TÉLÉCHARGEMENT* 📥\n\nLien reçu ! Je prépare ta vidéo..."}
         return {"message": "❌ Lien invalide."}
 
@@ -440,8 +446,8 @@ def whatsapp_webhook():
                         print(f"⚙️ Traitement de la commande pour {sender}...")
                         resp = process_command(user, text, 'whatsapp')
                         
-                        # Déclencher l'auto-réponse après 3 minutes si pas de réponse
-                        auto_reply_task.apply_async(args=[user.id, sender, text, 'whatsapp'], countdown=180)
+                        # Déclencher l'auto-réponse après 3 minutes si pas de réponse (Sécurisé)
+                        schedule_auto_reply(current_app._get_current_object(), user.id, sender, text, 'whatsapp')
                         
                         if wa_handler: 
                             res = wa_handler.send_text(sender, resp['message'])
@@ -564,8 +570,8 @@ def telegram_webhook():
 
         resp = process_command(user, text, 'telegram')
         
-        # Déclencher l'auto-réponse après 3 minutes si pas de réponse
-        auto_reply_task.apply_async(args=[user.id, chat_id, text, 'telegram'], countdown=180)
+        # Déclencher l'auto-réponse après 3 minutes si pas de réponse (Sécurisé)
+        schedule_auto_reply(current_app._get_current_object(), user.id, chat_id, text, 'telegram')
         
         if tg: tg.send_message(chat_id, resp['message'])
             
