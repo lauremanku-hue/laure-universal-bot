@@ -1,13 +1,25 @@
+import threading
+import time
 from celery import shared_task
 from .extensions import db
 from .models import User, Interaction
 from .modules.downloader import download_media
 
+def run_delayed_reply(app, user_id, platform_id, original_msg, platform):
+    """Exécute la relance après un délai dans un thread séparé."""
+    with app.app_context():
+        time.sleep(180) # Attendre 3 minutes
+        auto_reply_task(user_id, platform_id, original_msg, platform)
+
 @shared_task(name="tasks.process_download_task")
 def process_download_task(url, user_whatsapp_id):
     """Tâche de téléchargement asynchrone."""
     print(f"📥 Téléchargement pour {user_whatsapp_id}")
-    return download_media(url)
+    try:
+        return download_media(url)
+    except Exception as e:
+        print(f"❌ Erreur téléchargement: {e}")
+        return None
 
 @shared_task(name="tasks.auto_reply_task")
 def auto_reply_task(user_id, platform_id, original_msg, platform):
@@ -16,37 +28,47 @@ def auto_reply_task(user_id, platform_id, original_msg, platform):
     from .modules.ai_handler import AIHandler
     from .modules.whatsapp_handler import WhatsAppHandler
     from .modules.telegram_handler import TelegramHandler
-    import time
 
-    # On attend 3 minutes (180 secondes)
-    # Note: Dans un environnement réel, on utiliserait Celery countdown, mais ici on simule
-    
-    # Vérifier si une nouvelle interaction a eu lieu depuis le message original
-    # On cherche s'il y a eu un message de l'utilisateur (last_message != original_msg)
-    # ou si le statut est passé à 'replied'
-    user = User.query.get(user_id)
-    if not user: return "User not found"
+    try:
+        # Vérifier si une nouvelle interaction a eu lieu depuis le message original
+        user = User.query.get(user_id)
+        if not user: return "User not found"
 
-    # On récupère la dernière interaction
-    last_int = Interaction.query.filter_by(user_id=user_id).order_by(Interaction.timestamp.desc()).first()
-    
-    if last_int and last_int.status == 'pending':
-        # L'utilisateur n'a pas encore eu de réponse de Laure ou n'a pas relancé
-        ai = AIHandler()
-        wa = WhatsAppHandler()
-        tg = TelegramHandler()
-
-        # Générer une réponse basée sur l'humeur et le message
-        prompt = f"L'utilisateur a envoyé : '{original_msg}'. Il n'a pas répondu depuis 3 minutes. Envoie une relance amicale, drôle ou intrigante en fonction de son message pour le faire revenir discuter. Sois Laure."
-        reply = ai.generate_text(prompt)
-
-        if platform == 'whatsapp':
-            wa.send_text(platform_id, f"✨ *RELANCE AUTOMATIQUE* ✨\n\n{reply}")
-        elif platform == 'telegram':
-            tg.send_message(platform_id, f"✨ *RELANCE AUTOMATIQUE* ✨\n\n{reply}")
+        # On récupère la dernière interaction
+        last_int = Interaction.query.filter_by(user_id=user_id).order_by(Interaction.timestamp.desc()).first()
         
-        last_int.status = 'auto_replied'
-        db.session.commit()
-        return "Auto-réponse envoyée"
+        if last_int and last_int.status == 'pending':
+            # L'utilisateur n'a pas encore eu de réponse de Laure ou n'a pas relancé
+            ai = AIHandler()
+            wa = WhatsAppHandler()
+            tg = TelegramHandler()
+
+            # Générer une réponse basée sur l'humeur et le message
+            prompt = f"L'utilisateur a envoyé : '{original_msg}'. Il n'a pas répondu depuis 3 minutes. Envoie une relance amicale, drôle ou intrigante en fonction de son message pour le faire revenir discuter. Sois Laure."
+            reply = ai.generate_text(prompt)
+
+            if platform == 'whatsapp' and wa:
+                wa.send_text(platform_id, f"✨ *RELANCE AUTOMATIQUE* ✨\n\n{reply}")
+            elif platform == 'telegram' and tg:
+                tg.send_message(platform_id, f"✨ *RELANCE AUTOMATIQUE* ✨\n\n{reply}")
+            
+            last_int.status = 'auto_replied'
+            db.session.commit()
+            return "Auto-réponse envoyée"
+    except Exception as e:
+        print(f"❌ Erreur auto_reply_task: {e}")
     
     return "L'utilisateur a déjà répondu ou a été servi"
+
+def schedule_auto_reply(app, user_id, platform_id, original_msg, platform):
+    """Tente de planifier via Celery, sinon utilise un thread de secours."""
+    try:
+        # On tente Celery (nécessite Redis)
+        auto_reply_task.apply_async(args=[user_id, platform_id, original_msg, platform], countdown=180)
+        print("✅ Tâche auto-réponse planifiée via Celery.")
+    except Exception as e:
+        print(f"⚠️ Celery/Redis indisponible ({e}). Utilisation du thread de secours.")
+        # Fallback sur un thread (ne bloque pas le serveur)
+        thread = threading.Thread(target=run_delayed_reply, args=(app, user_id, platform_id, original_msg, platform))
+        thread.daemon = True
+        thread.start()
