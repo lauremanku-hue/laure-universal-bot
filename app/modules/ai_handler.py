@@ -17,16 +17,9 @@ class AIHandler:
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                # Tentative avec grounding, sinon repli sur modèle standard
-                try:
-                    self.model = genai.GenerativeModel(
-                        model_name='gemini-1.5-flash',
-                        tools=[{'google_search_retrieval': {}}]
-                    )
-                    print("✅ Gemini 1.5 Flash configuré avec Grounding.")
-                except:
-                    self.model = genai.GenerativeModel(model_name='gemini-1.5-flash')
-                    print("✅ Gemini 1.5 Flash configuré (Mode Standard).")
+                # Utilisation du modèle flash le plus récent
+                self.model = genai.GenerativeModel(model_name='gemini-1.5-flash-latest')
+                print("✅ Gemini 1.5 Flash configuré.")
             except Exception as e:
                 self.model = None
                 print(f"❌ Erreur configuration Gemini : {e}")
@@ -35,38 +28,51 @@ class AIHandler:
             print("⚠️ GEMINI_API_KEY non configurée.")
 
     def generate_text(self, prompt):
-        """Génère une réponse textuelle via Gemini."""
+        """Génère une réponse textuelle via Gemini avec une résilience maximale."""
         if not self.model:
             return "Désolé, mon cerveau (IA) n'est pas encore connecté. Contactez l'admin !"
         
+        # Paramètres de sécurité très souples pour éviter les blocages
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
+
         try:
             # Nettoyage du prompt
             safe_prompt = str(prompt).encode('utf-8', 'ignore').decode('utf-8')
-            response = self.model.generate_content(safe_prompt)
+            
+            # Tentative de génération standard (plus rapide et stable)
+            response = self.model.generate_content(
+                safe_prompt,
+                safety_settings=safety_settings
+            )
             
             if response and hasattr(response, 'text') and response.text:
                 return response.text
             
-            # Fallback si parts est présent mais pas text (grounding ou blocage)
-            if response and hasattr(response, 'parts'):
-                text_parts = [p.text for p in response.parts if hasattr(p, 'text')]
-                if text_parts:
-                    return "".join(text_parts)
+            # Gestion des cas où la réponse est bloquée ou vide
+            if response and hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate.content, 'parts'):
+                    text_parts = [p.text for p in candidate.content.parts if hasattr(p, 'text')]
+                    if text_parts:
+                        return "".join(text_parts)
             
-            return "Je n'ai pas pu formuler de réponse claire. Peux-tu reformuler ?"
+            return "Je n'ai pas pu formuler de réponse claire. Peux-tu reformuler ta question ?"
+
         except Exception as e:
             error_msg = str(e)
             print(f"❌ Erreur Gemini Text : {error_msg}")
-            # Si l'erreur vient du grounding, on tente sans outils
-            if "google_search_retrieval" in error_msg:
-                try:
-                    simple_model = genai.GenerativeModel(model_name='gemini-1.5-flash')
-                    res = simple_model.generate_content(prompt)
-                    return res.text
-                except: pass
             
-            if "quota" in error_msg.lower():
-                return "⏳ Je suis un peu fatiguée (quota atteint). Réessaie dans quelques minutes !"
+            if "quota" in error_msg.lower() or "429" in error_msg:
+                return "⏳ Je suis un peu fatiguée (quota atteint). Réessaie dans une minute !"
+            
+            if "api_key" in error_msg.lower() or "403" in error_msg:
+                return "⚠️ Erreur de configuration : La clé API est invalide ou restreinte."
+
             return "Oups, j'ai eu un petit bug en réfléchissant. Réessaie plus tard !"
 
     def generate_image_from_text(self, prompt):
