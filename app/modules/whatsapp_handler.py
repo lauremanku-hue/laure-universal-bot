@@ -31,6 +31,30 @@ class WhatsAppHandler:
             print(f"❌ Erreur send_text: {e}")
             return {"error": str(e)}
 
+    def send_image(self, recipient_id, image_url, caption=None):
+        """Envoie une image via une URL publique."""
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": recipient_id,
+            "type": "image",
+            "image": {
+                "link": image_url
+            }
+        }
+        if caption:
+            payload["image"]["caption"] = caption
+            
+        try:
+            response = requests.post(self.url, headers=headers, json=payload)
+            return response.json()
+        except Exception as e:
+            print(f"❌ Erreur WhatsApp send_image: {e}")
+            return {"error": str(e)}
+
     def send_sticker(self, recipient_id, sticker_id):
         """Envoie un sticker par son ID média Meta."""
         headers = {
@@ -44,4 +68,3 @@ class WhatsAppHandler:
             "sticker": {"id": sticker_id}
         }
         return requests.post(self.url, headers=headers, json=payload).json()
-
