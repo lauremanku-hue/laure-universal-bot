@@ -17,12 +17,16 @@ class AIHandler:
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                # Utilisation de gemini-1.5-flash qui est très stable et supporte le grounding
-                self.model = genai.GenerativeModel(
-                    model_name='gemini-1.5-flash',
-                    tools=[{'google_search_retrieval': {}}]
-                )
-                print("✅ Gemini 1.5 Flash configuré avec succès (Grounding activé).")
+                # Tentative avec grounding, sinon repli sur modèle standard
+                try:
+                    self.model = genai.GenerativeModel(
+                        model_name='gemini-1.5-flash',
+                        tools=[{'google_search_retrieval': {}}]
+                    )
+                    print("✅ Gemini 1.5 Flash configuré avec Grounding.")
+                except:
+                    self.model = genai.GenerativeModel(model_name='gemini-1.5-flash')
+                    print("✅ Gemini 1.5 Flash configuré (Mode Standard).")
             except Exception as e:
                 self.model = None
                 print(f"❌ Erreur configuration Gemini : {e}")
@@ -31,22 +35,36 @@ class AIHandler:
             print("⚠️ GEMINI_API_KEY non configurée.")
 
     def generate_text(self, prompt):
-        """Génère une réponse textuelle via Gemini avec recherche web."""
+        """Génère une réponse textuelle via Gemini."""
         if not self.model:
             return "Désolé, mon cerveau (IA) n'est pas encore connecté. Contactez l'admin !"
         
         try:
-            # On utilise le grounding pour des réponses "exactes et vraies"
-            response = self.model.generate_content(prompt)
+            # Nettoyage du prompt
+            safe_prompt = str(prompt).encode('utf-8', 'ignore').decode('utf-8')
+            response = self.model.generate_content(safe_prompt)
             
-            if response and response.text:
+            if response and hasattr(response, 'text') and response.text:
                 return response.text
-            else:
-                # Fallback si le grounding bloque ou si la réponse est vide
-                return "Je n'ai pas trouvé d'information exacte à ce sujet. Peux-tu être plus précis ?"
+            
+            # Fallback si parts est présent mais pas text (grounding ou blocage)
+            if response and hasattr(response, 'parts'):
+                text_parts = [p.text for p in response.parts if hasattr(p, 'text')]
+                if text_parts:
+                    return "".join(text_parts)
+            
+            return "Je n'ai pas pu formuler de réponse claire. Peux-tu reformuler ?"
         except Exception as e:
             error_msg = str(e)
             print(f"❌ Erreur Gemini Text : {error_msg}")
+            # Si l'erreur vient du grounding, on tente sans outils
+            if "google_search_retrieval" in error_msg:
+                try:
+                    simple_model = genai.GenerativeModel(model_name='gemini-1.5-flash')
+                    res = simple_model.generate_content(prompt)
+                    return res.text
+                except: pass
+            
             if "quota" in error_msg.lower():
                 return "⏳ Je suis un peu fatiguée (quota atteint). Réessaie dans quelques minutes !"
             return "Oups, j'ai eu un petit bug en réfléchissant. Réessaie plus tard !"
