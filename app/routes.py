@@ -367,7 +367,14 @@ def process_command(user, msg, platform):
         if ai:
             prompt = msg.replace('/img ', '').replace('/IMG ', '').replace('img ', '').replace('IMG ', '')
             res = ai.generate_image_from_text(prompt)
-            return {"message": f"🎨 Image générée pour : {prompt}\nLien : {res.get('url')}"}
+            if res['status'] == 'success':
+                image_url = res['url']
+                caption = f"🎨 Voici ton image : *{prompt}*"
+                if platform == 'whatsapp' and wa_handler:
+                    wa_handler.send_image(user.platform_id, image_url, caption)
+                elif platform == 'telegram' and tg:
+                    tg.send_photo(user.platform_id, image_url, caption)
+                return {"message": "🎨 Je prépare ton image... Un instant !"}
         return {"message": "Moteur d'image indisponible."}
 
     # 4. TÉLÉCHARGEMENT VIDÉO (Premium Check)
