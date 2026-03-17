@@ -33,10 +33,28 @@ def create_app():
     
     # Enregistrement des blueprints
     app.register_blueprint(main)
+    
     # Création automatique des tables au démarrage
     with app.app_context():
         db.create_all()
         print("🗄️ Base de données initialisée (Tables créées).")
+
+    # Thread de fond pour les cours programmés
+    def start_course_scheduler(app):
+        from .tasks import send_scheduled_courses
+        with app.app_context():
+            while True:
+                try:
+                    send_scheduled_courses()
+                except Exception as e:
+                    print(f"⚠️ Erreur Scheduler Cours : {e}")
+                import time
+                time.sleep(60) # Vérifier chaque minute
+
+    import threading
+    scheduler_thread = threading.Thread(target=start_course_scheduler, args=(app,))
+    scheduler_thread.daemon = True
+    scheduler_thread.start()
+    print("⏰ Scheduler de cours démarré.")
     
     return app
-
