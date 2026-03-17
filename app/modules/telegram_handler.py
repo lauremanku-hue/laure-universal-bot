@@ -25,3 +25,18 @@ class TelegramHandler:
             print(f"❌ Erreur Telegram send_message: {e}")
             return False
 
+    def send_photo(self, chat_id, photo_url, caption=None):
+        """Envoie une photo via une URL publique sur Telegram."""
+        if not self.token: return False
+        url = f"{self.base_url}/sendPhoto"
+        payload = {
+            "chat_id": chat_id,
+            "photo": photo_url,
+            "caption": caption,
+            "parse_mode": "Markdown"
+        }
+        try:
+            return requests.post(url, json=payload).json()
+        except Exception as e:
+            print(f"❌ Erreur Telegram send_photo: {e}")
+            return False
