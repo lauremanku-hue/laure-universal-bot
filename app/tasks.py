@@ -72,3 +72,32 @@ def schedule_auto_reply(app, user_id, platform_id, original_msg, platform):
         thread = threading.Thread(target=run_delayed_reply, args=(app, user_id, platform_id, original_msg, platform))
         thread.daemon = True
         thread.start()
+
+@shared_task(name="tasks.send_scheduled_courses")
+def send_scheduled_courses():
+    """Vérifie et envoie les cours programmés."""
+    from .models import Course, User
+    from .modules.whatsapp_handler import WhatsAppHandler
+    from .modules.telegram_handler import TelegramHandler
+    from datetime import datetime
+
+    now = datetime.utcnow()
+    # On récupère les cours non envoyés dont l'heure est passée
+    pending_courses = Course.query.filter_by(is_sent=False).filter(Course.scheduled_time <= now).all()
+    
+    wa = WhatsAppHandler()
+    tg = TelegramHandler()
+
+    for course in pending_courses:
+        try:
+            msg = f"🎓 *COURS PROGRAMMÉ* 🎓\n\n{course.content}"
+            if course.platform == 'whatsapp' and wa:
+                wa.send_text(course.target_group, msg)
+            elif course.platform == 'telegram' and tg:
+                tg.send_message(course.target_group, msg)
+            
+            course.is_sent = True
+            db.session.commit()
+            print(f"✅ Cours {course.id} envoyé à {course.target_group}")
+        except Exception as e:
+            print(f"❌ Erreur envoi cours {course.id}: {e}")
