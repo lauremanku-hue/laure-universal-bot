@@ -17,8 +17,8 @@ class AIHandler:
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                # Utilisation du modèle flash le plus récent
-                self.model = genai.GenerativeModel(model_name='gemini-1.5-flash-latest')
+                # Utilisation du nom de modèle standard stable
+                self.model = genai.GenerativeModel(model_name='gemini-1.5-flash')
                 print("✅ Gemini 1.5 Flash configuré.")
             except Exception as e:
                 self.model = None
