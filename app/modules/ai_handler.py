@@ -17,9 +17,9 @@ class AIHandler:
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                # Utilisation du nom de modèle standard stable
-                self.model = genai.GenerativeModel(model_name='gemini-1.5-flash')
-                print("✅ Gemini 1.5 Flash configuré.")
+                # Utilisation de gemini-pro comme alternative stable
+                self.model = genai.GenerativeModel(model_name='gemini-pro')
+                print("✅ Gemini Pro configuré.")
             except Exception as e:
                 self.model = None
                 print(f"❌ Erreur configuration Gemini : {e}")
