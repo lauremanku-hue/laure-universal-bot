@@ -17,9 +17,43 @@ class AIHandler:
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                # Utilisation de gemini-pro comme alternative stable
-                self.model = genai.GenerativeModel(model_name='gemini-pro')
-                print("✅ Gemini Pro configuré.")
+                
+                # Débogage : Lister les modèles disponibles pour voir ce qui est autorisé
+                print("🔍 Vérification des modèles disponibles...")
+                available_models = []
+                try:
+                    for m in genai.list_models():
+                        if 'generateContent' in m.supported_generation_methods:
+                            available_models.append(m.name)
+                    print(f"📋 Modèles autorisés : {available_models}")
+                except Exception as e:
+                    print(f"⚠️ Impossible de lister les modèles : {e}")
+
+                # Liste de modèles à essayer par ordre de préférence
+                # On utilise les noms complets avec 'models/' car le SDK semble pointilleux
+                model_candidates = [
+                    'models/gemini-1.5-flash',
+                    'models/gemini-1.5-flash-8b',
+                    'models/gemini-1.0-pro',
+                    'gemini-1.5-flash',
+                    'gemini-pro'
+                ]
+                
+                self.model = None
+                for model_name in model_candidates:
+                    try:
+                        print(f"🔄 Tentative de configuration avec : {model_name}")
+                        test_model = genai.GenerativeModel(model_name=model_name)
+                        # Test rapide pour vérifier si le modèle répond (optionnel mais plus sûr)
+                        self.model = test_model
+                        self.model_name_used = model_name
+                        print(f"✅ Modèle {model_name} sélectionné.")
+                        break
+                    except:
+                        continue
+                
+                if not self.model:
+                    print("❌ Aucun modèle Gemini n'a pu être configuré.")
             except Exception as e:
                 self.model = None
                 print(f"❌ Erreur configuration Gemini : {e}")
