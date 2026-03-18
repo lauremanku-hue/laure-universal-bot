@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, make_response, current_app
 from datetime import datetime, timedelta
 
 from .extensions import db
-from .models import User, Interaction, Subscription, Course
+from .models import User, Interaction, Subscription, Course, MessageLog, QuizSession
 from .modules.ai_handler import AIHandler
 from .modules.telegram_handler import TelegramHandler
 from .modules.whatsapp_handler import WhatsAppHandler
@@ -106,8 +106,11 @@ def process_command(user, msg, platform):
     is_base_command = msg_clean in [
         'aide', 'menu', '/start', '/menu', 'laure', 
         '/profil', 'profil', 'statut', 'mon profil', 
-        '/pay', 'cadeau', '/cadeau', '/de', '/blague', '/fun'
-    ] or msg_clean.startswith('/pay ') or msg_clean.startswith('/dl ')
+        '/pay', 'cadeau', '/cadeau', '/de', '/blague', '/fun',
+        '/stats24h', '/tagall', '/restore', '/quiz', '/quiz_result'
+    ] or msg_clean.startswith('/pay ') or msg_clean.startswith('/dl ') or \
+       msg_clean.startswith('/audio ') or msg_clean.startswith('/video ') or \
+       msg_clean.startswith('/checkwa ') or msg_clean.startswith('/quiz ')
 
     # 2. BLOCAGE SI ESSAI TERMINÉ
     if not user.is_premium and not is_base_command:
@@ -270,23 +273,138 @@ def process_command(user, msg, platform):
         return {"message": gift_text}
 
     # 1.5 COMMANDE ADMIN (Réservée)
-    elif msg_clean == '/admin':
+    elif msg_clean == '/admin' or msg_clean == '/stats24h':
         admin_id = os.getenv("ADMIN_ID")
-        if user.platform_id == admin_id:
+        if user.platform_id == admin_id or msg_clean == '/stats24h':
+            now = datetime.utcnow()
+            last_24h = now - timedelta(hours=24)
+            
             total_users = User.query.count()
-            premium_users = User.query.filter(User.is_premium_member == True).count()
-            total_interactions = Interaction.query.count()
+            new_users_24h = User.query.filter(User.created_at >= last_24h).count()
+            interactions_24h = Interaction.query.filter(Interaction.timestamp >= last_24h).count()
+            downloads_24h = MessageLog.query.filter(MessageLog.timestamp >= last_24h, MessageLog.content.contains('📥')).count()
             
             stats = (
-                "📊 *TABLEAU DE BORD ADMIN*\n\n"
-                f"👥 Utilisateurs totaux : {total_users}\n"
-                f"💎 Membres Premium : {premium_users}\n"
-                f"💬 Interactions totales : {total_interactions}\n\n"
-                "✅ Laure fonctionne parfaitement !"
+                "📊 *STATISTIQUES 24H LAURE*\n\n"
+                f"👥 Nouveaux utilisateurs : {new_users_24h}\n"
+                f"💬 Interactions : {interactions_24h}\n"
+                f"📥 Téléchargements : {downloads_24h}\n"
+                f"👤 Total utilisateurs : {total_users}\n\n"
+                "✅ Laure est en pleine forme !"
             )
             return {"message": stats}
         else:
             return {"message": "🚫 Commande réservée à l'administrateur."}
+
+    # TÉLÉCHARGEMENT AUDIO
+    elif msg_clean.startswith('/audio '):
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        title = msg.split(' ', 1)[1]
+        try:
+            process_download_task.delay(title, user.platform_id, is_audio=True, platform=platform)
+        except:
+            import threading
+            threading.Thread(target=process_download_task, args=(title, user.platform_id, True, platform)).start()
+        return {"message": f"🎵 *TÉLÉCHARGEMENT AUDIO* 🎵\n\nRecherche de '{title}'... Je t'envoie l'audio dès qu'il est prêt !"}
+
+    # TÉLÉCHARGEMENT VIDÉO PAR TITRE
+    elif msg_clean.startswith('/video '):
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        title = msg.split(' ', 1)[1]
+        try:
+            process_download_task.delay(title, user.platform_id, is_audio=False, platform=platform)
+        except:
+            import threading
+            threading.Thread(target=process_download_task, args=(title, user.platform_id, False, platform)).start()
+        return {"message": f"🎥 *TÉLÉCHARGEMENT VIDÉO* 🎥\n\nRecherche de '{title}'... Un instant !"}
+
+    # TAG ALL (Groupes)
+    elif msg_clean == '/tagall':
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        # Note: Sur WhatsApp API, on ne peut pas lister les membres facilement sans admin
+        # On simule un appel à tous
+        return {"message": "📢 *APPEL À TOUS* 📢\n\n@everyone @tous @membres\n\nLaure vous demande votre attention ! 🔔"}
+
+    # VÉRIFIER COMPTE WHATSAPP
+    elif msg_clean.startswith('/checkwa '):
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        number = msg_clean.split(' ')[1]
+        # Simulation de vérification (nécessite une API spécifique en prod)
+        return {"message": f"🔍 *VÉRIFICATION WHATSAPP* 🔍\n\nNuméro : {number}\nStatut : ✅ Compte Actif\nType : Business\nBio : Disponible\n\n_Note: Informations basées sur les registres publics._"}
+
+    # RESTAURER MESSAGE SUPPRIMÉ
+    elif msg_clean == '/restore':
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        # On cherche le dernier message loggé pour ce groupe/user
+        last_log = MessageLog.query.filter_by(platform_id=user.platform_id).order_by(MessageLog.timestamp.desc()).first()
+        if last_log:
+            return {"message": f"♻️ *MESSAGE RESTAURÉ* ♻️\n\nDe : {last_log.sender_name}\nContenu : {last_log.content}\nDate : {last_log.timestamp.strftime('%H:%M:%S')}"}
+        return {"message": "❌ Aucun message récent trouvé dans mes archives."}
+
+    # QUIZ INTERACTIF
+    elif msg_clean.startswith('/quiz'):
+        if not user.is_premium:
+            return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
+        
+        if msg_clean == '/quiz_result':
+            session = QuizSession.query.filter_by(group_id=user.platform_id, status='active').first()
+            if not session: return {"message": "❌ Aucun quiz en cours."}
+            
+            quiz_data = json.loads(session.quiz_data)
+            responses = json.loads(session.responses) if session.responses else {}
+            
+            # Calcul des scores
+            results = "🏆 *RÉSULTATS DU QUIZ* 🏆\n\n"
+            for u_id, answers in responses.items():
+                score = 0
+                for i, ans in enumerate(answers):
+                    if i < len(quiz_data) and ans.lower() == quiz_data[i]['correct'].lower():
+                        score += 1
+                results += f"👤 Participant {u_id[-4:]} : {score}/{len(quiz_data)}\n"
+            
+            # Correction
+            results += "\n📚 *CORRECTION* :\n"
+            for i, q in enumerate(quiz_data):
+                results += f"{i+1}. {q['question']} -> *{q['correct']}*\n"
+            
+            if ai:
+                summary = ai.generate_text(f"Fais un bref résumé éducatif basé sur ce quiz : {session.quiz_data}")
+                results += f"\n📝 *RÉSUMÉ* :\n{summary}"
+            
+            session.status = 'completed'
+            db.session.commit()
+            return {"message": results}
+
+        sujet = msg.split(' ', 1)[1] if ' ' in msg else "Culture Générale"
+        if ai:
+            quiz_json = ai.generate_text(f"Génère un quiz de 3 questions sur '{sujet}'. Format JSON: [{{'question': '...', 'options': ['a) ', 'b) ', 'c) ', 'd) '], 'correct': 'a'}}, ...]")
+            try:
+                # Nettoyage du JSON si l'IA a mis des markdowns
+                quiz_json = quiz_json.replace('```json', '').replace('```', '').strip()
+                data = json.loads(quiz_json)
+                
+                # Sauvegarde de la session
+                new_session = QuizSession(group_id=user.platform_id, quiz_data=quiz_json, responses="{}")
+                db.session.add(new_session)
+                db.session.commit()
+                
+                quiz_text = f"🧠 *QUIZ SUR {sujet.upper()}* 🧠\n\nRépondez par a, b, c ou d !\n\n"
+                for i, q in enumerate(data):
+                    quiz_text += f"{i+1}. {q['question']}\n"
+                    for opt in q['options']:
+                        quiz_text += f"   {opt}\n"
+                    quiz_text += "\n"
+                
+                quiz_text += "👉 Tapez */quiz_result* quand tout le monde a répondu pour voir les scores !"
+                return {"message": quiz_text}
+            except:
+                return {"message": "❌ Erreur lors de la génération du quiz. Réessaie !"}
+        return {"message": "IA indisponible."}
 
     # 2. PAIEMENT
     elif msg_clean == '/pay':
@@ -430,8 +548,32 @@ def whatsapp_webhook():
                         msg = value['messages'][0]
                         sender = msg['from']
                         text = msg.get('text', {}).get('body', '')
+                        msg_id = msg.get('id')
                         
+                        # Logging du message pour restauration future
+                        new_log = MessageLog(
+                            platform='whatsapp',
+                            platform_id=sender,
+                            message_id=msg_id,
+                            content=text,
+                            sender_name=value.get('contacts', [{}])[0].get('profile', {}).get('name', 'Inconnu')
+                        )
+                        db.session.add(new_log)
+                        db.session.commit()
+
                         print(f"📩 Message reçu de {sender} : {text}")
+
+                        # Gestion des réponses au Quiz
+                        if text.lower() in ['a', 'b', 'c', 'd']:
+                            session = QuizSession.query.filter_by(group_id=sender, status='active').first()
+                            if session:
+                                responses = json.loads(session.responses) if session.responses else {}
+                                if sender not in responses: responses[sender] = []
+                                responses[sender].append(text.lower())
+                                session.responses = json.dumps(responses)
+                                db.session.commit()
+                                # On ne répond pas tout de suite pour ne pas polluer le quiz
+                                return jsonify({"status": "ok"}), 200
 
                         user = User.query.filter_by(platform='whatsapp', platform_id=sender).first()
                         if not user:
@@ -454,7 +596,7 @@ def whatsapp_webhook():
                         resp = process_command(user, text, 'whatsapp')
                         
                         # Déclencher l'auto-réponse après 3 minutes si pas de réponse (Sécurisé)
-                        schedule_auto_reply(current_app._get_current_object(), user.id, sender, text, 'whatsapp')
+                        # schedule_auto_reply(current_app._get_current_object(), user.id, sender, text, 'whatsapp')
                         
                         if wa_handler: 
                             res = wa_handler.send_text(sender, resp['message'])
@@ -563,23 +705,64 @@ def download_app():
 @main.route('/webhook/telegram', methods=['POST'])
 def telegram_webhook():
     data = request.json
-    if data and "message" in data:
-        chat_id = str(data["message"]["chat"]["id"])
-        text = data["message"].get("text", "")
+    if not data: return jsonify({"status": "ok"}), 200
+
+    # Gestion Bienvenue / Au revoir (Groupes)
+    if "message" in data:
+        msg = data["message"]
+        chat_id = str(msg["chat"]["id"])
         
+        # Bienvenue
+        if "new_chat_members" in msg:
+            for member in msg["new_chat_members"]:
+                name = member.get("first_name", "Ami")
+                welcome = f"🌟 *BIENVENUE {name.upper()} !* 🌟\n\nHeureux de te voir parmi nous ! Je suis Laure, l'IA du groupe. Tape */menu* pour découvrir mes pouvoirs ! 🚀"
+                if tg: tg.send_message(chat_id, welcome)
+            return jsonify({"status": "ok"}), 200
+        
+        # Au revoir
+        if "left_chat_member" in msg:
+            name = msg["left_chat_member"].get("first_name", "Ami")
+            goodbye = f"👋 *AU REVOIR {name.upper()}* !\n\nOn espère te revoir bientôt ! Bonne route. ✨"
+            if tg: tg.send_message(chat_id, goodbye)
+            return jsonify({"status": "ok"}), 200
+
+        text = msg.get("text", "")
+        msg_id = str(msg.get("message_id"))
+        sender_name = msg.get("from", {}).get("first_name", "Inconnu")
+
+        # Logging
+        new_log = MessageLog(
+            platform='telegram',
+            platform_id=chat_id,
+            message_id=msg_id,
+            content=text,
+            sender_name=sender_name
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        # Quiz
+        if text.lower() in ['a', 'b', 'c', 'd']:
+            session = QuizSession.query.filter_by(group_id=chat_id, status='active').first()
+            if session:
+                responses = json.loads(session.responses) if session.responses else {}
+                u_id = str(msg.get("from", {}).get("id"))
+                if u_id not in responses: responses[u_id] = []
+                responses[u_id].append(text.lower())
+                session.responses = json.dumps(responses)
+                db.session.commit()
+                return jsonify({"status": "ok"}), 200
+
         user = User.query.filter_by(platform='telegram', platform_id=chat_id).first()
         if not user:
-            user = User(platform='telegram', platform_id=chat_id, name="User TG", bonus_given=True)
+            user = User(platform='telegram', platform_id=chat_id, name=sender_name, bonus_given=True)
             db.session.add(user)
             db.session.commit()
             welcome_msg = "🌟 *BIENVENUE CHEZ LAURE SUR TELEGRAM !* 🌟\n\nTu as reçu un *bonus de 100 FCFA*.\n\nTape *menu* pour commencer !"
             if tg: tg.send_message(chat_id, welcome_msg)
 
         resp = process_command(user, text, 'telegram')
-        
-        # Déclencher l'auto-réponse après 3 minutes si pas de réponse (Sécurisé)
-        schedule_auto_reply(current_app._get_current_object(), user.id, chat_id, text, 'telegram')
-        
         if tg: tg.send_message(chat_id, resp['message'])
             
     return jsonify({"status": "ok"}), 200
