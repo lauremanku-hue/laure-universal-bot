@@ -55,20 +55,31 @@ class WhatsAppHandler:
             print(f"❌ Erreur WhatsApp send_image: {e}")
             return {"error": str(e)}
 
+    import mimetypes
     def upload_media(self, file_path, media_type):
         """Upload un fichier local vers Meta et retourne le media_id."""
         url = f"https://graph.facebook.com/{self.version}/{self.phone_number_id}/media"
         headers = {
             "Authorization": f"Bearer {self.access_token}"
         }
+        
+        # Détecter le type MIME réel du fichier
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if not mime_type:
+            mime_type = "audio/mpeg" if media_type == "audio" else "video/mp4"
+            
         files = {
-            "file": (os.path.basename(file_path), open(file_path, "rb"), "audio/mpeg" if media_type == "audio" else "video/mp4"),
+            "file": (os.path.basename(file_path), open(file_path, "rb"), mime_type),
             "messaging_product": (None, "whatsapp"),
             "type": (None, media_type)
         }
         try:
             response = requests.post(url, headers=headers, files=files)
-            return response.json().get("id")
+            res_json = response.json()
+            if "id" not in res_json:
+                print(f"❌ Erreur upload WhatsApp: {res_json}")
+                return None
+            return res_json.get("id")
         except Exception as e:
             print(f"❌ Erreur upload WhatsApp: {e}")
             return None
