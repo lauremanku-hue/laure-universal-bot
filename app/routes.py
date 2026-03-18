@@ -10,7 +10,7 @@ from .modules.ai_handler import AIHandler
 from .modules.telegram_handler import TelegramHandler
 from .modules.whatsapp_handler import WhatsAppHandler
 from .modules.downloader import validate_url
-from .tasks import process_download_task, schedule_auto_reply
+from .tasks import process_download_task, schedule_auto_reply, schedule_download_task
 
 main = Blueprint('main', __name__)
 
@@ -48,7 +48,7 @@ def handle_wizard(user, msg, msg_clean):
         user.state_data = json.dumps(data)
         user.current_state = 'awaiting_course_group'
         db.session.commit()
-        return {"message": "✅ Contenu reçu !\n\nÉtape 2 : Quel est le *nom exact* du groupe ou du canal où je dois poster ce cours ?"}
+        return {"message": "✅ Contenu reçu !\n\nÉtape 2 : Quel est l' *ID exact* du groupe ou du canal ?\n\n💡 *Astuce* :\n- Sur WhatsApp, c'est l'ID du groupe (ex: 1234567890@g.us).\n- Sur Telegram, c'est l'ID numérique (ex: -100123456789) ou le @nom_utilisateur."}
 
     elif state == 'awaiting_course_group':
         data['group'] = msg
@@ -63,12 +63,21 @@ def handle_wizard(user, msg, msg_clean):
             time_parts = msg.split(':')
             if len(time_parts) != 2: raise ValueError()
             
+            # Calcul de l'heure programmée (on suppose aujourd'hui)
+            now = datetime.utcnow()
+            h, m = map(int, time_parts)
+            scheduled = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            
+            # Si l'heure est déjà passée aujourd'hui, on prévoit pour demain
+            if scheduled <= now:
+                scheduled += timedelta(days=1)
+
             # Création du cours dans la DB
             new_course = Course(
                 user_id=user.id,
                 content=data['content'],
                 target_group=data['group'],
-                scheduled_time=datetime.utcnow() + timedelta(hours=1), # Simplification pour le test
+                scheduled_time=scheduled,
                 platform=user.platform
             )
             db.session.add(new_course)
@@ -304,16 +313,16 @@ def process_command(user, msg, platform):
         else:
             return {"message": "🚫 Commande réservée à l'administrateur."}
 
+    # COMMANDE ID (Pour les groupes)
+    elif msg_clean == '/id':
+        return {"message": f"🆔 *ID DE CETTE CONVERSATION* 🆔\n\n`{user.platform_id}`\n\n💡 _Utilise cet ID pour configurer tes cours programmés !_"}
+
     # TÉLÉCHARGEMENT AUDIO
     elif msg_clean.startswith('/audio '):
         if not user.is_premium:
             return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
         title = msg.split(' ', 1)[1]
-        try:
-            process_download_task.delay(title, user.platform_id, is_audio=True, platform=platform)
-        except:
-            import threading
-            threading.Thread(target=process_download_task, args=(title, user.platform_id, True, platform)).start()
+        schedule_download_task(current_app._get_current_object(), title, user.platform_id, is_audio=True, platform=platform)
         return {"message": f"🎵 *TÉLÉCHARGEMENT AUDIO* 🎵\n\nRecherche de '{title}'... Je t'envoie l'audio dès qu'il est prêt !"}
 
     # TÉLÉCHARGEMENT VIDÉO PAR TITRE
@@ -321,11 +330,7 @@ def process_command(user, msg, platform):
         if not user.is_premium:
             return {"message": "❌ *ACCÈS PREMIUM REQUIS*"}
         title = msg.split(' ', 1)[1]
-        try:
-            process_download_task.delay(title, user.platform_id, is_audio=False, platform=platform)
-        except:
-            import threading
-            threading.Thread(target=process_download_task, args=(title, user.platform_id, False, platform)).start()
+        schedule_download_task(current_app._get_current_object(), title, user.platform_id, is_audio=False, platform=platform)
         return {"message": f"🎥 *TÉLÉCHARGEMENT VIDÉO* 🎥\n\nRecherche de '{title}'... Un instant !"}
 
     # TAG ALL (Groupes)
@@ -507,7 +512,7 @@ def process_command(user, msg, platform):
     elif validate_url(msg):
         if not user.is_premium:
             return {"message": "❌ *ACCÈS PREMIUM REQUIS*\n\nLe téléchargement de vidéos est réservé aux abonnés. Tapez */pay* pour profiter de Laure en illimité !"}
-        process_download_task.delay(msg, user.platform_id)
+        schedule_download_task(current_app._get_current_object(), msg, user.platform_id, platform=platform)
         return {"message": "📥 Lien reçu ! Analyse en cours..."}
 
     # 5. IA UNIVERSELLE (Répond à tout le reste)
