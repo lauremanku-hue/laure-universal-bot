@@ -31,7 +31,7 @@ def download_media(url, is_audio=False):
         url = f"ytsearch1:{url}"
 
     ydl_opts = {
-        'format': 'bestaudio/best' if is_audio else 'best[ext=mp4]/best',
+        'format': 'bestaudio[ext=m4a]/bestaudio/best' if is_audio else 'best[ext=mp4]/best',
         'outtmpl': f'{DOWNLOAD_FOLDER}/{unique_id}_%(title)s.%(ext)s',
         'noplaylist': True,
         'max_filesize': 50 * 1024 * 1024, # Limite à 50MB pour WhatsApp
