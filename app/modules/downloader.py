@@ -36,7 +36,17 @@ def download_media(url, is_audio=False):
         'noplaylist': True,
         'max_filesize': 50 * 1024 * 1024, # Limite à 50MB pour WhatsApp
         'quiet': True,
-        'no_warnings': True
+        'no_warnings': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'referer': 'https://www.google.com/',
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['web', 'android'],
+                'skip': ['webpage', 'hls', 'dash']
+            }
+        }
     }
 
     # if is_audio:
@@ -48,7 +58,17 @@ def download_media(url, is_audio=False):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+            try:
+                info = ydl.extract_info(url, download=True)
+            except Exception as e:
+                if "Sign in to confirm you're not a bot" in str(e) and not url.startswith('http'):
+                    # Si YouTube bloque la recherche, on tente SoundCloud
+                    print("⚠️ YouTube bloqué, tentative sur SoundCloud...")
+                    url_sc = f"scsearch1:{url.replace('ytsearch1:', '')}"
+                    info = ydl.extract_info(url_sc, download=True)
+                else:
+                    raise e
+            
             if 'entries' in info:
                 # C'est un résultat de recherche
                 info = info['entries'][0]
