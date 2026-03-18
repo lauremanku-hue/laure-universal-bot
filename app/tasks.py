@@ -12,11 +12,29 @@ def run_delayed_reply(app, user_id, platform_id, original_msg, platform):
         auto_reply_task(user_id, platform_id, original_msg, platform)
 
 @shared_task(name="tasks.process_download_task")
-def process_download_task(url, user_whatsapp_id):
+def process_download_task(url, user_platform_id, is_audio=False, platform='whatsapp'):
     """Tâche de téléchargement asynchrone."""
-    print(f"📥 Téléchargement pour {user_whatsapp_id}")
+    from .modules.whatsapp_handler import WhatsAppHandler
+    from .modules.telegram_handler import TelegramHandler
+    
+    print(f"📥 Téléchargement {'audio' if is_audio else 'vidéo'} pour {user_platform_id}")
     try:
-        return download_media(url)
+        res = download_media(url, is_audio=is_audio)
+        if res['status'] == 'success':
+            file_path = res['file_path']
+            media_type = 'audio' if is_audio else 'video'
+            
+            if platform == 'whatsapp':
+                wa = WhatsAppHandler()
+                wa.send_local_media(user_platform_id, file_path, media_type)
+            elif platform == 'telegram':
+                tg = TelegramHandler()
+                tg.send_local_file(user_platform_id, file_path, media_type)
+            
+            # Optionnel : Supprimer le fichier après envoi pour économiser de l'espace
+            # os.remove(file_path)
+            return "Success"
+        return "Error: " + res.get('message', 'Unknown')
     except Exception as e:
         print(f"❌ Erreur téléchargement: {e}")
         return None
