@@ -4,7 +4,7 @@ import uuid
 import re
 
 # Dossier de téléchargement à la racine
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
 
 def validate_url(url):
@@ -39,12 +39,12 @@ def download_media(url, is_audio=False):
         'no_warnings': True
     }
 
-    if is_audio:
-        ydl_opts['postprocessors'] = [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }]
+    # if is_audio:
+    #     ydl_opts['postprocessors'] = [{
+    #         'key': 'FFmpegExtractAudio',
+    #         'preferredcodec': 'mp3',
+    #         'preferredquality': '192',
+    #     }]
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -54,9 +54,9 @@ def download_media(url, is_audio=False):
                 info = info['entries'][0]
             
             filename = ydl.prepare_filename(info)
-            if is_audio:
-                # yt-dlp change l'extension après le post-processing
-                filename = os.path.splitext(filename)[0] + ".mp3"
+            # if is_audio:
+            #     # yt-dlp change l'extension après le post-processing
+            #     filename = os.path.splitext(filename)[0] + ".mp3"
 
             return {
                 "status": "success",
