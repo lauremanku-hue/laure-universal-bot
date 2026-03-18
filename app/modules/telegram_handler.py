@@ -56,3 +56,31 @@ class TelegramHandler:
         except Exception as e:
             print(f"❌ Erreur Telegram send_local_file: {e}")
             return False
+
+    def set_bot_commands(self):
+        """Configure le menu des commandes du bot Telegram."""
+        if not self.token: return False
+        url = f"{self.base_url}/setMyCommands"
+        commands = [
+            {"command": "start", "description": "Lancer le bot et voir le menu"},
+            {"command": "menu", "description": "Menu"},
+            {"command": "img", "description": "image"},
+            {"command": "audio", "description": "audio"},
+            {"command": "video", "description": "Vidéo"},
+            {"command": "cours", "description": "Suivre un cours interactif"},
+            {"command": "quiz", "description": "Quiz"},
+            {"command": "quiz_result", "description": "résultats quiz"},
+            {"command": "profil", "description": "Statut et bonus"},
+            {"command": "pay", "description": "VIP"},
+            {"command": "blague", "description": "Blague"},
+            {"command": "de", "description": "Lancer un dé"},
+            {"command": "terre", "description": "Un fait sur la Terre"},
+            {"command": "tagall", "description": "Taguer le monde (Groupes)"},
+            {"command": "checkwa", "description": "Vérifier numéro WhatsApp"},
+            {"command": "restore", "description": "Restaurer un message supprimé"}
+        ]
+        try:
+            return requests.post(url, json={"commands": commands}).json()
+        except Exception as e:
+            print(f"❌ Erreur Telegram set_bot_commands: {e}")
+            return False
