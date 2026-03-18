@@ -95,3 +95,23 @@ class Course(db.Model):
     is_sent = db.Column(db.Boolean, default=False)
     platform = db.Column(db.String(20))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class MessageLog(db.Model):
+    __tablename__ = 'laure_message_log'
+    id = db.Column(db.Integer, primary_key=True)
+    platform = db.Column(db.String(20))
+    platform_id = db.Column(db.String(100)) # ID de l'utilisateur ou du groupe
+    message_id = db.Column(db.String(100)) # ID unique du message sur la plateforme
+    content = db.Column(db.Text)
+    sender_name = db.Column(db.String(100))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+class QuizSession(db.Model):
+    __tablename__ = 'laure_quiz_session'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.String(100)) # ID du groupe ou de l'utilisateur
+    quiz_data = db.Column(db.Text) # JSON contenant les questions et réponses
+    responses = db.Column(db.Text) # JSON contenant les réponses des participants {user_id: [answers]}
+    status = db.Column(db.String(20), default='active') # active, completed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime)
