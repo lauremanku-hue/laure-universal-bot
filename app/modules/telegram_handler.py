@@ -40,3 +40,19 @@ class TelegramHandler:
         except Exception as e:
             print(f"❌ Erreur Telegram send_photo: {e}")
             return False
+
+    def send_local_file(self, chat_id, file_path, media_type):
+        """Envoie un fichier local vers Telegram."""
+        if not self.token: return False
+        method = 'sendAudio' if media_type == 'audio' else 'sendVideo'
+        url = f"{self.base_url}/{method}"
+        files = {
+            'audio' if media_type == 'audio' else 'video': open(file_path, 'rb')
+        }
+        data = {'chat_id': chat_id}
+        try:
+            response = requests.post(url, data=data, files=files)
+            return response.json()
+        except Exception as e:
+            print(f"❌ Erreur Telegram send_local_file: {e}")
+            return False
