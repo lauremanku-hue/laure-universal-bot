@@ -10,37 +10,27 @@ try:
 except ImportError:
     HAS_PILLOW = False
     print("⚠️ AVERTISSEMENT : La librairie 'Pillow' n'est pas installée.")
-
-class AIHandler:
-    def __init__(self):
-        """Initialise l'IA avec le modèle le plus récent et stable."""
+    
+    
+    class AIHandler:
+          def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
         self.model = None
-        
         if self.api_key:
             try:
-                # Configuration de base
-                genai.configure(api_key=self.api_key)
+                # FORCE LA VERSION V1 STABLE
+                genai.configure(api_key=self.api_key, transport='rest')
                 
-                # Utilisation de gemini-1.5-flash : rapide, gratuit et supporté en v1
-                # On définit une instruction système pour donner une personnalité au bot
-                system_instruction = (
-                    "Tu es l'assistant de Laure. Tu aides les étudiants au Cameroun. "
-                    "Sois amical, utilise parfois des expressions locales si besoin. "
-                    "Tarifs : 500 FCFA (1 sem), 750 FCFA (2.5 sem), 1500 FCFA (1 mois). "
-                    "Si on te demande un cours, donne un contenu structuré et éducatif."
-                )
-
+                # Le nom du modèle doit être exactement celui-ci
+                model_name = 'gemini-1.5-flash' 
+                
                 self.model = genai.GenerativeModel(
-                    model_name='gemini-1.5-flash',
-                    system_instruction=system_instruction
+                    model_name=model_name,
+                    system_instruction="Tu es l'assistant de Laure au Cameroun. Aide les étudiants."
                 )
-                print("✅ IA Gemini (1.5-flash) opérationnelle sur Railway.")
-                
+                print(f"✅ IA Gemini 1.5-Flash opérationnelle sur API v1.")
             except Exception as e:
-                print(f"❌ Erreur critique configuration Gemini : {e}")
-        else:
-            print("⚠️ GEMINI_API_KEY manquante dans les variables d'environnement.")
+                print(f"❌ Erreur : {e}")
 
     def generate_text(self, prompt):
         """Génère une réponse textuelle."""
