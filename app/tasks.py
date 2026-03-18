@@ -11,12 +11,31 @@ def run_delayed_reply(app, user_id, platform_id, original_msg, platform):
         time.sleep(180) # Attendre 3 minutes
         auto_reply_task(user_id, platform_id, original_msg, platform)
 
+def schedule_download_task(app, url, user_platform_id, is_audio=False, platform='whatsapp'):
+    """Tente de planifier via Celery, sinon utilise un thread de secours."""
+    try:
+        process_download_task.apply_async(args=[url, user_platform_id, is_audio, platform])
+        print(f"✅ Tâche téléchargement planifiée via Celery pour {user_platform_id}")
+    except Exception as e:
+        print(f"⚠️ Celery/Redis indisponible ({e}). Utilisation du thread de secours pour le téléchargement.")
+        thread = threading.Thread(target=run_download_thread, args=(app, url, user_platform_id, is_audio, platform))
+        thread.daemon = True
+        thread.start()
+
+def run_download_thread(app, url, user_platform_id, is_audio, platform):
+    """Exécute le téléchargement dans un thread séparé."""
+    with app.app_context():
+        process_download_task(url, user_platform_id, is_audio, platform)
+
 @shared_task(name="tasks.process_download_task")
 def process_download_task(url, user_platform_id, is_audio=False, platform='whatsapp'):
     """Tâche de téléchargement asynchrone."""
     from .modules.whatsapp_handler import WhatsAppHandler
     from .modules.telegram_handler import TelegramHandler
     
+    wa = WhatsAppHandler()
+    tg = TelegramHandler()
+
     print(f"📥 Téléchargement {'audio' if is_audio else 'vidéo'} pour {user_platform_id}")
     try:
         res = download_media(url, is_audio=is_audio)
@@ -25,17 +44,27 @@ def process_download_task(url, user_platform_id, is_audio=False, platform='whats
             media_type = 'audio' if is_audio else 'video'
             
             if platform == 'whatsapp':
-                wa = WhatsAppHandler()
                 wa.send_local_media(user_platform_id, file_path, media_type)
             elif platform == 'telegram':
-                tg = TelegramHandler()
                 tg.send_local_file(user_platform_id, file_path, media_type)
             
             # Optionnel : Supprimer le fichier après envoi pour économiser de l'espace
-            # os.remove(file_path)
+            if os.path.exists(file_path):
+                os.remove(file_path)
             return "Success"
-        return "Error: " + res.get('message', 'Unknown')
+        else:
+            error_msg = f"❌ Erreur lors du téléchargement : {res.get('message', 'Inconnu')}"
+            if platform == 'whatsapp':
+                wa.send_text(user_platform_id, error_msg)
+            elif platform == 'telegram':
+                tg.send_message(user_platform_id, error_msg)
+            return "Error: " + res.get('message', 'Unknown')
     except Exception as e:
+        error_msg = f"❌ Erreur système lors du téléchargement : {str(e)}"
+        if platform == 'whatsapp':
+            wa.send_text(user_platform_id, error_msg)
+        elif platform == 'telegram':
+            tg.send_message(user_platform_id, error_msg)
         print(f"❌ Erreur téléchargement: {e}")
         return None
 
