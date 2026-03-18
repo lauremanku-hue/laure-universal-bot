@@ -2,6 +2,7 @@ import os
 import requests
 from io import BytesIO
 import google.generativeai as genai
+from google.generativeai import client
 
 # Import sécurisé de Pillow (PIL)
 try:
@@ -11,18 +12,6 @@ except ImportError:
     HAS_PILLOW = False
     print("⚠️ AVERTISSEMENT : La librairie 'Pillow' n'est pas installée.")
 
-class AIHandler:
-    def __init__(self):
-        self.api_key = os.getenv("GEMINI_API_KEY")
-        self.model = None
-        
-        if self.api_key:
-            try:
-                genai.configure(api_key=self.api_key)
-                
-                # Modèles 2026 : gemini-1.5-flash est le meilleur pour WhatsApp (rapide & gratuit)
-                # Dans ton fichier ai_handler.py
-from google.generativeai import client
 
 class AIHandler:
     def __init__(self):
