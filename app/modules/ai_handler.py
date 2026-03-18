@@ -21,7 +21,7 @@ class AIHandler:
                 genai.configure(api_key=self.api_key)
                 
                 # Modèles 2026 : gemini-1.5-flash est le meilleur pour WhatsApp (rapide & gratuit)
-                model_name = 'gemini-1.5-flash'
+                model_name = 'models/gemini-1.5-flash'
                 
                 # Instruction système : donne un rôle et des instructions de prix au bot
                 system_prompt = (
