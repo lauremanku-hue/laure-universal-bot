@@ -21,28 +21,26 @@ class AIHandler:
                 genai.configure(api_key=self.api_key)
                 
                 # Modèles 2026 : gemini-1.5-flash est le meilleur pour WhatsApp (rapide & gratuit)
-                model_name = 'models/gemini-1.5-flash'
-                
-                # Instruction système : donne un rôle et des instructions de prix au bot
-                system_prompt = (
-                    "Tu es l'assistant intelligent de Laure. Ton rôle est d'aider les étudiants "
-                    "au Cameroun (Université de Yaoundé I, etc.). "
-                    "Sois amical et concis. "
-                    "Tarifs : 500 FCFA (1 sem), 750 FCFA (2.5 sem), 1500 FCFA (1 mois). "
-                    "Si on te demande un cours, donne un plan clair et structuré."
-                )
+                # Dans ton fichier ai_handler.py
+from google.generativeai import client
 
-                print(f"🔄 Configuration du modèle : {model_name}")
-                self.model = genai.GenerativeModel(
-                    model_name=model_name,
-                    system_instruction=system_prompt
-                )
-                print(f"✅ Modèle {model_name} opérationnel.")
+class AIHandler:
+    def __init__(self):
+        self.api_key = os.getenv("GEMINI_API_KEY")
+        self.model = None
+        
+        if self.api_key:
+            try:
+                # On force l'utilisation de la version 'v1' au lieu de 'v1beta'
+                genai.configure(api_key=self.api_key, transport='rest') 
                 
-            except Exception as e:
-                print(f"❌ Erreur configuration Gemini : {e}")
-        else:
-            print("⚠️ GEMINI_API_KEY non configurée dans Railway.")
+                # On définit le modèle explicitement
+                model_name = 'gemini-1.5-flash'
+                
+                self.model = genai.GenerativeModel(
+                    model_name=model_name
+                )
+                print(f"✅ Modèle {model_name} configuré sur API v1.")
 
     def generate_text(self, prompt):
         """Génère une réponse via Gemini avec gestion d'erreurs."""
