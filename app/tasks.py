@@ -46,7 +46,10 @@ def process_download_task(url, user_platform_id, is_audio=False, platform='whats
             media_type = 'audio' if is_audio else 'video'
             
             if platform == 'whatsapp':
-                wa.send_local_media(user_platform_id, file_path, media_type)
+                send_res = wa.send_local_media(user_platform_id, file_path, media_type)
+                if 'error' in send_res or 'errors' in send_res:
+                    print(f"❌ Erreur envoi WhatsApp: {send_res}")
+                    wa.send_text(user_platform_id, f"❌ Erreur lors de l'envoi du fichier à WhatsApp : {send_res}")
             elif platform == 'telegram':
                 tg.send_local_file(user_platform_id, file_path, media_type)
             
