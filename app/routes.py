@@ -28,10 +28,6 @@ try:
     tg = TelegramHandler()
     wa_handler = WhatsAppHandler()
     print("✅ Handlers (AI, Telegram, WhatsApp) opérationnels.")
-    
-    # Configure les commandes Telegram au démarrage
-    if tg:
-        tg.set_bot_commands()
 except Exception as e:
     print(f"⚠️ Erreur initialisation Handlers : {e}")
     ai = None
