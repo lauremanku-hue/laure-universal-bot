@@ -28,6 +28,10 @@ try:
     tg = TelegramHandler()
     wa_handler = WhatsAppHandler()
     print("✅ Handlers (AI, Telegram, WhatsApp) opérationnels.")
+    
+    # Configure les commandes Telegram au démarrage
+    if tg:
+        tg.set_bot_commands()
 except Exception as e:
     print(f"⚠️ Erreur initialisation Handlers : {e}")
     ai = None
@@ -102,15 +106,12 @@ def process_command(user, msg, platform):
     if user.current_state != 'idle':
         return handle_wizard(user, msg, msg_clean)
 
-    # 1. COMMANDES DE BASE (Toujours accessibles)
+    # 1. COMMANDES DE BASE (Toujours accessibles pour s'abonner ou voir son profil)
     is_base_command = msg_clean in [
         'aide', 'menu', '/start', '/menu', 'laure', 
         '/profil', 'profil', 'statut', 'mon profil', 
-        '/pay', 'cadeau', '/cadeau', '/de', '/blague', '/fun',
-        '/stats24h', '/tagall', '/restore', '/quiz', '/quiz_result'
-    ] or msg_clean.startswith('/pay ') or msg_clean.startswith('/dl ') or \
-       msg_clean.startswith('/audio ') or msg_clean.startswith('/video ') or \
-       msg_clean.startswith('/checkwa ') or msg_clean.startswith('/quiz ')
+        '/pay', 'cadeau', '/cadeau', '/stats24h', '/admin', '/setmenu'
+    ] or msg_clean.startswith('/pay ')
 
     # 2. BLOCAGE SI ESSAI TERMINÉ
     if not user.is_premium and not is_base_command:
@@ -199,42 +200,40 @@ def process_command(user, msg, platform):
 
     # 1. MENU & AIDE
     if msg_clean in ['aide', 'menu', '/start', '/menu', 'laure']:
-        if user.is_premium:
-            menu_text = (
-                "💎 *MENU VIP LAURE* 💎\n\n"
-                "Félicitations ! Tu es un membre **VIP**. Profite de toute ma puissance sans limites ! 🚀\n\n"
-                "✨ *TES PRIVILÈGES :*\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🧠 *IA Illimitée* : Pose toutes tes questions sans fin.\n"
-                "🎨 *Images* : Tape `/img ton idée` (Illimité)\n"
-                "📥 *Téléchargements* : Tape `/dl [lien]`\n"
-                "🎓 *Cours Express* : Tape `/cours [sujet]`\n"
-                "📅 *Programmer Cours* : Tape `/config_cours`\n"
-                "📥 *Auto-DL* : Tape `/dl_auto` (Vues uniques)\n"
-                "📲 *Statuts* : Tape `/status` (WA, FB, TG)\n"
-                "🎭 *Fun* : `/blague`, `/quiz`, `/de`, `/terre`\n"
-                "👤 *Statut* : Tape `statut` pour voir tes infos\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "📢 *PARTAGE LAURE* : Aide tes amis à découvrir Laure !"
-                f"{contact_info}"
-            )
-        else:
-            menu_text = (
-                "🚀 *LAURE - TON ASSISTANTE IA TOUT-EN-UN* 🚀\n\n"
-                "Salut ! Je suis Laure. Je suis là pour t'aider à apprendre, créer et t'amuser ! ✨\n\n"
-                "💡 *CE QUE JE PEUX FAIRE POUR TOI :*\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🧠 *Répondre à tout* : Pose-moi n'importe quelle question !\n"
-                "🎨 *Images* : Tape `/img ton idée` (VIP 💎)\n"
-                "📥 *Télécharger* : Tape `/dl [lien]` (VIP 💎)\n"
-                "🎓 *Cours* : Tape `/cours [sujet]` (VIP 💎)\n"
-                "🎭 *Divertissement* : `/blague`, `/de`, `/terre`\n"
-                "👤 *Mon Profil* : Tape `statut` pour voir tes bonus\n"
-                "💎 *Devenir VIP* : Tape `/pay` pour l'illimité + 500 Mo offerts !\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "📢 *PARTAGE LAURE* : Transfère ce message à tes amis !"
-                f"{contact_info}"
-            )
+        # On affiche toutes les commandes à tout le monde
+        # Mais on précise si c'est grâce à l'essai ou à l'abonnement
+        
+        status_header = "💎 *MENU VIP LAURE* 💎"
+        if not user.is_premium_member and user.trial_days_left > 0:
+            status_header = "🎁 *MENU ESSAI VIP (3 JOURS)* 🎁"
+        elif not user.is_premium:
+            status_header = "🆓 *MENU GRATUIT (Limité)* 🆓"
+
+        menu_text = (
+            f"{status_header}\n\n"
+            "Voici tout ce que je peux faire pour toi :\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🧠 *IA* : Pose-moi n'importe quelle question !\n"
+            "🎨 *Images* : `/img [ton idée]`\n"
+            "🎵 *Audio* : `/audio [titre]`\n"
+            "🎬 *Vidéo* : `/video [titre]`\n"
+            "🎓 *Cours* : `/cours [sujet]`\n"
+            "📝 *Cours Auto* : `/config_cours`\n"
+            "🧠 *Quiz* : `/quiz [sujet]`\n"
+            "🏆 *Quiz Result* : `/quiz_result`\n"
+            "📥 *Auto-DL* : `/dl_auto` (Vues uniques)\n"
+            "📲 *Statuts* : `/status` (WA, FB, TG)\n"
+            "📢 *Tag All* : `/tagall` (Groupes)\n"
+            "🔍 *Check WA* : `/checkwa [numéro]`\n"
+            "♻️ *Restore* : `/restore` (Messages supprimés)\n"
+            "🎭 *Fun* : `/blague`, `/de`, `/terre`\n"
+            "👤 *Profil* : `statut` ou `/profil`\n"
+            "💎 *S'abonner* : `/pay` (VIP Illimité)\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Profite bien de tes 3 jours d'essai offerts ! Après cela, tu devras t'abonner pour continuer à utiliser ces services._\n\n"
+            "📢 *PARTAGE LAURE* : Aide tes amis à découvrir Laure !"
+            f"{contact_info}"
+        )
         return {"message": menu_text + warning}
 
     # 1.1 COMMANDE PROFIL / STATUT
@@ -273,9 +272,18 @@ def process_command(user, msg, platform):
         return {"message": gift_text}
 
     # 1.5 COMMANDE ADMIN (Réservée)
-    elif msg_clean == '/admin' or msg_clean == '/stats24h':
+    elif msg_clean == '/admin' or msg_clean == '/stats24h' or msg_clean == '/setmenu':
         admin_id = os.getenv("ADMIN_ID")
-        if user.platform_id == admin_id or msg_clean == '/stats24h':
+        # On autorise aussi les numéros hardcoded dans models.py pour plus de souplesse
+        admins = ["237659867487", "237686683246", "2376697236373", "659867487", "686683246", "6697236373"]
+        
+        if user.platform_id == admin_id or user.platform_id in admins:
+            if msg_clean == '/setmenu':
+                if tg:
+                    res = tg.set_bot_commands()
+                    return {"message": f"✅ Menu Telegram mis à jour : {res}"}
+                return {"message": "❌ Handler Telegram non disponible."}
+
             now = datetime.utcnow()
             last_24h = now - timedelta(hours=24)
             
