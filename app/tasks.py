@@ -31,6 +31,7 @@ def run_download_thread(app, url, user_platform_id, is_audio, platform):
 @shared_task(name="tasks.process_download_task")
 def process_download_task(url, user_platform_id, is_audio=False, platform='whatsapp'):
     """Tâche de téléchargement asynchrone."""
+    import os
     from .modules.whatsapp_handler import WhatsAppHandler
     from .modules.telegram_handler import TelegramHandler
     
