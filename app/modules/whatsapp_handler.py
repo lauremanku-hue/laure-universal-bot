@@ -79,9 +79,15 @@ class WhatsAppHandler:
         
         # Détecter le type MIME réel du fichier
         mime_type, _ = mimetypes.guess_type(file_path)
-        if not mime_type:
+        
+        # Correction pour Meta : m4a doit être audio/mp4 ou audio/aac
+        if file_path.endswith('.m4a'):
+            mime_type = "audio/mp4"
+        elif not mime_type:
             mime_type = "audio/mpeg" if media_type == "audio" else "video/mp4"
             
+        print(f"📤 Upload WhatsApp: {file_path} (MIME: {mime_type}, Type: {media_type})")
+        
         files = {
             "file": (os.path.basename(file_path), open(file_path, "rb"), mime_type),
             "messaging_product": (None, "whatsapp"),
@@ -92,17 +98,23 @@ class WhatsAppHandler:
             res_json = response.json()
             if "id" not in res_json:
                 print(f"❌ Erreur upload WhatsApp: {res_json}")
-                return None
+                return {"error": res_json}
             return res_json.get("id")
         except Exception as e:
             print(f"❌ Erreur upload WhatsApp: {e}")
-            return None
+            return {"error": str(e)}
 
     def send_local_media(self, recipient_id, file_path, media_type):
         """Upload et envoie un média local."""
-        media_id = self.upload_media(file_path, media_type)
-        if not media_id: return {"error": "Upload failed"}
+        res_upload = self.upload_media(file_path, media_type)
+        if isinstance(res_upload, dict) and "error" in res_upload:
+            return res_upload
+        
+        media_id = res_upload
+        if not media_id: return {"error": "Upload failed (no id)"}
 
+        print(f"🚀 Envoi média WhatsApp: {media_id} à {recipient_id}")
+        
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
@@ -113,4 +125,11 @@ class WhatsAppHandler:
             "type": media_type,
             media_type: {"id": media_id}
         }
-        return requests.post(self.url, headers=headers, json=payload).json()
+        try:
+            response = requests.post(self.url, headers=headers, json=payload)
+            res_json = response.json()
+            print(f"📩 Réponse envoi WhatsApp: {res_json}")
+            return res_json
+        except Exception as e:
+            print(f"❌ Erreur envoi WhatsApp: {e}")
+            return {"error": str(e)}
