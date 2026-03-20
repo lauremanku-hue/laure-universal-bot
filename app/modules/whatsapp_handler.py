@@ -1,5 +1,6 @@
 import os
 import requests
+import mimetypes
 
 class WhatsAppHandler:
     def __init__(self):
@@ -14,6 +15,20 @@ class WhatsAppHandler:
             print("⚠️ WhatsAppHandler: Token ou PhoneID manquant dans .env")
             return {"error": "Config manquante"}
 
+        # WhatsApp limit is 4096 characters.
+        # If text is longer, we split it.
+        MAX_LEN = 4000 # Safety margin
+        if len(text) > MAX_LEN:
+            parts = [text[i:i+MAX_LEN] for i in range(0, len(text), MAX_LEN)]
+            results = []
+            for part in parts:
+                res = self._send_single_text(recipient_id, part)
+                results.append(res)
+            return results[0] if results else {"error": "No parts sent"}
+        
+        return self._send_single_text(recipient_id, text)
+
+    def _send_single_text(self, recipient_id, text):
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
@@ -55,7 +70,6 @@ class WhatsAppHandler:
             print(f"❌ Erreur WhatsApp send_image: {e}")
             return {"error": str(e)}
 
-    import mimetypes
     def upload_media(self, file_path, media_type):
         """Upload un fichier local vers Meta et retourne le media_id."""
         url = f"https://graph.facebook.com/{self.version}/{self.phone_number_id}/media"
