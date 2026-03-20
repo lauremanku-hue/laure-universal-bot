@@ -1,4 +1,3 @@
-
 import os
 import requests
 from io import BytesIO
@@ -33,16 +32,27 @@ class AIHandler:
 
                 # Liste de priorité intelligente
                 candidates = []
-                # 1. Ajouter les modèles trouvés par l'API en priorité
+                
+                # Priorité aux modèles Gemini stables
+                preferred = [
+                    'models/gemini-1.5-flash',
+                    'models/gemini-1.5-pro',
+                    'models/gemini-2.0-flash-exp',
+                    'models/gemini-1.0-pro'
+                ]
+                
+                for p in preferred:
+                    if p in models:
+                        candidates.append(p)
+                
+                # Ajouter les autres modèles trouvés par l'API
                 for m in models:
                     if m not in candidates: candidates.append(m)
                 
-                # 2. Ajouter les noms standards au cas où le listage a échoué
+                # Ajouter les noms standards au cas où le listage a échoué
                 fallback_names = [
                     'models/gemini-1.5-flash',
                     'models/gemini-1.5-pro',
-                    'models/gemini-1.0-pro',
-                    'models/gemini-1.3-pro',
                     'gemini-1.5-flash',
                     'gemini-pro'
                 ]
@@ -69,12 +79,12 @@ class AIHandler:
         else:
             print("⚠️ GEMINI_API_KEY manquante dans l'environnement.")
 
-    def generate_text(self, prompt):
+    def generate_text(self, prompt, retries=2):
         """Génère une réponse textuelle avec une tolérance aux pannes maximale."""
         if not self.model:
             return "Désolé, mon cerveau (IA) n'est pas encore configuré. Vérifiez la clé API !"
         
-        # Paramètres de sécurité (on commence par le plus strict, puis on assouplit si ça bloque)
+        # Paramètres de sécurité
         safety_settings = [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -98,7 +108,7 @@ class AIHandler:
                     if hasattr(response, 'text') and response.text:
                         return response.text
                 except:
-                    # Si .text échoue (souvent dû au blocage de sécurité), on fouille les candidats
+                    # Si .text échoue, on fouille les candidats
                     if hasattr(response, 'candidates') and response.candidates:
                         parts = response.candidates[0].content.parts
                         text = "".join([p.text for p in parts if hasattr(p, 'text')])
@@ -110,19 +120,17 @@ class AIHandler:
             error_msg = str(e).lower()
             print(f"❌ Erreur génération texte ({self.model_name_used}) : {error_msg}")
             
+            if ("500" in error_msg or "internal error" in error_msg) and retries > 0:
+                print(f"🔄 Erreur 500 détectée, tentative de retry ({retries} restantes)...")
+                import time
+                time.sleep(1)
+                return self.generate_text(prompt, retries=retries-1)
+
             if "quota" in error_msg or "429" in error_msg:
                 return "⏳ Je suis un peu surchargée (quota atteint). Réessaie dans une minute !"
             
             if "safety" in error_msg or "finish_reason: 3" in error_msg:
                 return "🛡️ Désolé, ce sujet est bloqué par mes filtres de sécurité. Essayons autre chose !"
-
-            # Tentative de secours ultime avec un prompt ultra-simple si c'est un bug complexe
-            try:
-                fallback_res = self.model.generate_content("Dis bonjour poliment.")
-                if fallback_res.text:
-                    return "J'ai eu un petit souci technique, mais je suis là ! Que puis-je faire pour toi ?"
-            except:
-                pass
 
             return "Oups, j'ai eu un petit bug en réfléchissant. Réessaie plus tard !"
 
