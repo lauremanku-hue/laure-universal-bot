@@ -4,7 +4,6 @@ import qrcode
 import time
 from neonize.client import NewClient
 from neonize.events import Message
-from neonize.types import MessageSource
 from .ai_handler import AIHandler
 from .downloader import download_media
 
