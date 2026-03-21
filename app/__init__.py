@@ -5,7 +5,8 @@ from .routes import main
 
 def create_app():
     import os
-    app = Flask(__name__)
+    from flask import send_from_directory
+    app = Flask(__name__, static_folder='../dist', static_url_path='/')
     
     # Configuration
     # On utilise DATABASE_URL de Railway, sinon un sqlite local
@@ -34,6 +35,13 @@ def create_app():
     # Enregistrement des blueprints
     app.register_blueprint(main)
     
+    # Configuration Webhook Telegram (si Token et APP_URL présents)
+    from .routes import tg
+    app_url = os.environ.get('APP_URL')
+    if tg and app_url:
+        tg.set_webhook(app_url)
+        tg.set_bot_commands()
+
     # Création automatique des tables au démarrage
     with app.app_context():
         db.create_all()
