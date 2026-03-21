@@ -1,5 +1,6 @@
 [phases.setup]
-aptPkgs = ["libmagic1", "ffmpeg"]
+nixPkgs = ["python311", "nodejs", "libmagic", "ffmpeg", "file"]
+aptPkgs = ["libmagic1", "libmagic-dev"]
 
 [phases.build]
-cmds = ["pip install -r requirements.txt"]
+cmds = ["npm install", "npm run build", "pip install -r requirements.txt"]
