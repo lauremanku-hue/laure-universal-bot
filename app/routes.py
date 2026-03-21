@@ -1,7 +1,7 @@
 import os
 import json
 import random
-from flask import Blueprint, request, jsonify, make_response, current_app
+from flask import Blueprint, request, jsonify, make_response, current_app, send_from_directory
 from datetime import datetime, timedelta
 
 from .extensions import db
@@ -13,6 +13,14 @@ from .modules.downloader import validate_url
 from .tasks import process_download_task, schedule_auto_reply, schedule_download_task
 
 main = Blueprint('main', __name__)
+
+@main.route('/', defaults={'path': ''})
+@main.route('/<path:path>')
+def serve_spa(path):
+    if path != "" and os.path.exists(os.path.join(current_app.static_folder, path)):
+        return send_from_directory(current_app.static_folder, path)
+    else:
+        return send_from_directory(current_app.static_folder, 'index.html')
 
 def send_data_bonus(phone, network):
     """
