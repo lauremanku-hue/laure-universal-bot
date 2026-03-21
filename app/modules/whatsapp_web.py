@@ -222,4 +222,3 @@ class LaureWebBot:
 if __name__ == "__main__":
     bot = LaureWebBot()
     bot.start()
-voici le contenu de mon fichier whatsapp_web.py aide moi a le corriger stp
