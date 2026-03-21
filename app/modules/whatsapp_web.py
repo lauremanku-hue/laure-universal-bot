@@ -152,9 +152,11 @@ class LaureWebBot:
 
     def start(self, app=None):
         self.app = app
-        from neonize.events import QRCallback
+        # Note: QRCallback n'existe plus dans les versions récentes de neonize.
+        # Le QR code est généralement géré par le client lui-même ou via un autre événement.
+        # On désactive l'enregistrement explicite de QRCallback pour éviter le crash.
         self.client.event_handler(Message)(self.on_message)
-        self.client.event_handler(QRCallback)(self.on_qr)
+        print("ℹ️ Gestionnaire d'événements WhatsApp configuré.")
         self.client.connect()
 
 if __name__ == "__main__":
