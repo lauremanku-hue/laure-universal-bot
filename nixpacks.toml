@@ -1,0 +1,5 @@
+[phases.setup]
+aptPkgs = ["libmagic1", "ffmpeg"]
+
+[phases.build]
+cmds = ["pip install -r requirements.txt"]
