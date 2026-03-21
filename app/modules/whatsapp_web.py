@@ -13,7 +13,7 @@ from app.extensions import db
 from app.models import User, MessageLog, QuizSession
 
 class LaureWebBot:
-    def __init__(self):
+  def __init__(self):
         # Initialisation du client. On essaie de passer le callback QR directement si supporté.
         try:
             self.client = NewClient("laure_session.db", qr_callback=self.on_qr)
