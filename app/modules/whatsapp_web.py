@@ -152,6 +152,15 @@ class LaureWebBot:
 
     def start(self, app=None):
         self.app = app
+        # Enregistrement du callback QR
+        try:
+            if hasattr(self.client, 'on_qr'):
+                self.client.on_qr(self.on_qr)
+            elif hasattr(self.client, 'qr_callback'):
+                self.client.qr_callback(self.on_qr)
+        except Exception as e:
+            print(f"⚠️ Erreur lors de l'enregistrement du callback QR : {e}")
+
         # Note: QRCallback n'existe plus dans les versions récentes de neonize.
         # On utilise une méthode de détection dynamique pour enregistrer le gestionnaire de messages
         # car l'API de neonize peut varier selon la version installée.
@@ -172,7 +181,15 @@ class LaureWebBot:
             except:
                 pass
         
-        self.client.connect()
+        while True:
+            try:
+                print("🚀 Tentative de connexion WhatsApp Web...")
+                self.client.connect()
+                # Si connect() est bloquant et se termine, on attend un peu avant de relancer
+                time.sleep(5)
+            except Exception as e:
+                print(f"❌ Erreur de connexion WhatsApp : {e}")
+                time.sleep(10)
 
 if __name__ == "__main__":
     bot = LaureWebBot()
