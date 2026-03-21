@@ -34,3 +34,4 @@ yt-dlp
 requests==2.31.0
 neonize
 qrcode[pil]
+python-magic
