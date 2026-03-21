@@ -18,6 +18,46 @@ from .modules.whatsapp_web import LaureWebBot
 main = Blueprint('main', __name__)
 bot = LaureWebBot()
 
+@main.route('/pair-phone', methods=['GET', 'POST'])
+def pair_phone():
+    pairing_code = None
+    error = None
+    if request.method == 'POST':
+        phone = request.form.get('phone')
+        if phone:
+            pairing_code = bot.pair_with_phone(phone)
+            if not pairing_code or "non supportée" in str(pairing_code):
+                error = pairing_code or "Une erreur est survenue"
+                pairing_code = None
+    
+    return f"""
+    <div style="font-family: sans-serif; text-align: center; padding: 40px; background: #f0f2f5; min-height: 100vh;">
+        <div style="background: white; max-width: 500px; margin: 0 auto; padding: 30px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h1 style="color: #128C7E;">📲 Connexion par Numéro</h1>
+            
+            {f'<div style="background: #ffebee; color: #c62828; padding: 10px; border-radius: 10px; margin-bottom: 20px;">{error}</div>' if error else ''}
+            
+            {f'''
+            <div style="background: #e8f5e9; padding: 20px; border-radius: 15px; margin: 20px 0;">
+                <p style="font-size: 1.2em; color: #2e7d32;">Votre code de couplage :</p>
+                <div style="font-size: 2.5em; font-weight: bold; letter-spacing: 5px; color: #1b5e20; margin: 10px 0;">{pairing_code}</div>
+                <p style="font-size: 0.9em; color: #666;">Entrez ce code sur votre téléphone après avoir cliqué sur "Lier avec un numéro de téléphone" dans WhatsApp.</p>
+            </div>
+            ''' if pairing_code else f'''
+            <form method="POST" style="margin-top: 20px;">
+                <p style="color: #666; margin-bottom: 20px;">Entrez votre numéro au format international (ex: 237659867487)</p>
+                <input type="text" name="phone" placeholder="237..." required style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 20px; font-size: 1.1em;">
+                <button type="submit" style="width: 100%; padding: 12px; background: #25D366; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 1.1em;">Générer le code</button>
+            </form>
+            '''}
+            
+            <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                <a href="/qr-status" style="color: #128C7E; text-decoration: none; font-weight: bold;">← Retour au QR Code</a>
+            </div>
+        </div>
+    </div>
+    """
+
 @main.route('/qr-status')
 def qr_status():
     return f"""
@@ -29,6 +69,10 @@ def qr_status():
                 <img src='/qr-code-image?t={datetime.now().timestamp()}' style="width: 300px;" />
             </div>
             <p style="color: #666; font-size: 0.9em;">1. Ouvrez WhatsApp sur votre téléphone<br>2. Allez dans Appareils connectés<br>3. Connecter un appareil</p>
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                <p style="color: #666;">Le QR Code ne s'affiche pas ?</p>
+                <a href="/pair-phone" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background: #128C7E; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; text-decoration: none;">Lier avec un numéro de téléphone</a>
+            </div>
             <button onclick="location.reload()" style="margin-top: 20px; padding: 12px 24px; background: #25D366; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold;">Actualiser la page</button>
         </div>
     </div>
