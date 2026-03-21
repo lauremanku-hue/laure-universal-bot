@@ -31,38 +31,23 @@ class AIHandler:
                     print(f"⚠️ Erreur lors du listage des modèles : {e}")
                     models = []
 
-                # Liste de priorité intelligente
-                candidates = []
-                
-                # Priorité aux modèles Gemini stables
-                preferred = [
+                # Liste de priorité intelligente (modèles stables d'abord)
+                candidates = [
                     'gemini-1.5-flash',
+                    'gemini-1.5-flash-latest',
+                    'gemini-2.0-flash',
                     'gemini-1.5-pro',
-                    'gemini-2.0-flash-exp',
-                    'gemini-1.0-pro'
+                    'gemini-1.0-pro',
+                    'gemma-3-27b-it',
+                    'gemma-3-12b-it',
+                    'gemma-3-4b-it',
+                    'gemma-3-1b-it'
                 ]
                 
-                for p in preferred:
-                    if p in models or f"models/{p}" in models:
-                        candidates.append(p)
-                
-                # Ajouter les autres modèles trouvés par l'API
-                for m in models:
-                    m_short = m.replace('models/', '')
-                    if m_short not in candidates: candidates.append(m_short)
-                
-                # Ajouter les noms standards au cas où le listage a échoué
-                fallback_names = [
-                    'gemini-1.5-flash',
-                    'gemini-1.5-pro',
-                    'gemini-1.0-pro'
-                ]
-                for name in fallback_names:
-                    if name not in candidates: candidates.append(name)
-
-                for model_name in candidates:
+                # On ne teste que les 5 premiers candidats pour gagner du temps
+                for model_name in candidates[:5]:
                     try:
-                        print(f"🔄 Tentative de validation : {model_name}")
+                        print(f"🔄 Validation IA : {model_name}")
                         # Test de validation minimal
                         self.client.models.generate_content(
                             model=model_name,
@@ -70,10 +55,10 @@ class AIHandler:
                             config=types.GenerateContentConfig(max_output_tokens=1)
                         )
                         self.model_name_used = model_name
-                        print(f"✅ IA opérationnelle avec le modèle : {model_name}")
+                        print(f"✅ IA opérationnelle avec : {model_name}")
                         break
                     except Exception as e:
-                        print(f"❌ Échec avec {model_name} : {str(e)[:100]}")
+                        print(f"❌ {model_name} indisponible (Quota/Autre)")
                         self.model_name_used = "aucun"
                 
                 if self.model_name_used == "aucun":
