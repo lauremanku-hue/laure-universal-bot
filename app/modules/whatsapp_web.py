@@ -3,7 +3,7 @@ import json
 import qrcode
 import time
 from neonize.client import NewClient
-from neonize.events import MessageEvent
+from neonize.events import Message
 from neonize.types import MessageSource
 from .ai_handler import AIHandler
 from .downloader import download_media
@@ -26,7 +26,7 @@ class LaureWebBot:
         print("🌟 NOUVEAU QR CODE GÉNÉRÉ 🌟")
         print("="*50 + "\n")
         
-    def on_message(self, client, event: MessageEvent):
+    def on_message(self, client, event: Message):
         # On ignore les messages envoyés par le bot lui-même
         if event.Info.IsFromMe:
             return
@@ -154,7 +154,7 @@ class LaureWebBot:
     def start(self, app=None):
         self.app = app
         from neonize.events import QRCallback
-        self.client.event_handler(MessageEvent)(self.on_message)
+        self.client.event_handler(Message)(self.on_message)
         self.client.event_handler(QRCallback)(self.on_qr)
         self.client.connect()
 
