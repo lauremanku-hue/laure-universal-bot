@@ -871,6 +871,21 @@ def telegram_webhook():
             content=text,
             sender_name=sender_name
         )
+        db.session.add(new_log)
+        db.session.commit()
+
+        # Quiz
+        if text.lower() in ['a', 'b', 'c', 'd']:
+            session = QuizSession.query.filter_by(group_id=chat_id, status='active').first()
+            if session:
+                responses = json.loads(session.responses) if session.responses else {}
+                u_id = str(msg.get("from", {}).get("id"))
+                if u_id not in responses: responses[u_id] = []
+                responses[u_id].append(text.lower())
+                session.responses = json.dumps(responses)
+                db.session.commit()
+                return jsonify({"status": "ok"}), 200
+
         user = User.query.filter_by(platform='telegram', platform_id=chat_id).first()
         if not user:
             user = User(platform='telegram', platform_id=chat_id, name=sender_name, bonus_given=True)
