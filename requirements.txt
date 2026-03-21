@@ -20,7 +20,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 Pillow>=10.0.0
 protobuf>=5.26.1
-google-generativeai>=0.8.0
+google-generativeai
 gunicorn==21.2.0
 redis==7.1.0
 six==1.17.0
