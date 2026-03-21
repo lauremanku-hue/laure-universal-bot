@@ -1,7 +1,8 @@
 import os
 import requests
 from io import BytesIO
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # Import sécurisé de Pillow (PIL)
 try:
@@ -14,17 +15,17 @@ except ImportError:
 class AIHandler:
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
-        self.model = None
+        self.client = None
         self.model_name_used = "aucun"
         
         if self.api_key:
             try:
-                # Configuration avec version explicite
-                genai.configure(api_key=self.api_key)
+                # Configuration avec le nouveau SDK
+                self.client = genai.Client(api_key=self.api_key)
                 
                 print("🔍 Recherche des modèles Gemini accessibles...")
                 try:
-                    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    models = [m.name for m in self.client.models.list()]
                     print(f"📋 Modèles trouvés : {models}")
                 except Exception as e:
                     print(f"⚠️ Erreur lors du listage des modèles : {e}")
@@ -35,44 +36,47 @@ class AIHandler:
                 
                 # Priorité aux modèles Gemini stables
                 preferred = [
-                    'models/gemini-1.5-flash',
-                    'models/gemini-1.5-pro',
-                    'models/gemini-2.0-flash-exp',
-                    'models/gemini-1.0-pro'
+                    'gemini-1.5-flash',
+                    'gemini-1.5-pro',
+                    'gemini-2.0-flash-exp',
+                    'gemini-1.0-pro'
                 ]
                 
                 for p in preferred:
-                    if p in models:
+                    if p in models or f"models/{p}" in models:
                         candidates.append(p)
                 
                 # Ajouter les autres modèles trouvés par l'API
                 for m in models:
-                    if m not in candidates: candidates.append(m)
+                    m_short = m.replace('models/', '')
+                    if m_short not in candidates: candidates.append(m_short)
                 
                 # Ajouter les noms standards au cas où le listage a échoué
                 fallback_names = [
-                    'models/gemini-1.5-flash',
-                    'models/gemini-1.5-pro',
                     'gemini-1.5-flash',
-                    'gemini-pro'
+                    'gemini-1.5-pro',
+                    'gemini-1.0-pro'
                 ]
                 for name in fallback_names:
                     if name not in candidates: candidates.append(name)
 
                 for model_name in candidates:
                     try:
-                        print(f"🔄 Tentative d'initialisation : {model_name}")
-                        self.model = genai.GenerativeModel(model_name=model_name)
+                        print(f"🔄 Tentative de validation : {model_name}")
                         # Test de validation minimal
-                        self.model.generate_content("test", generation_config={"max_output_tokens": 1})
+                        self.client.models.generate_content(
+                            model=model_name,
+                            contents="test",
+                            config=types.GenerateContentConfig(max_output_tokens=1)
+                        )
                         self.model_name_used = model_name
                         print(f"✅ IA opérationnelle avec le modèle : {model_name}")
                         break
                     except Exception as e:
                         print(f"❌ Échec avec {model_name} : {str(e)[:100]}")
-                        self.model = None
+                        self.model_name_used = "aucun"
                 
-                if not self.model:
+                if self.model_name_used == "aucun":
                     print("⚠️ Aucun modèle n'a pu être validé. Laure fonctionnera en mode dégradé.")
             except Exception as e:
                 print(f"❌ Erreur critique configuration IA : {e}")
@@ -81,38 +85,33 @@ class AIHandler:
 
     def generate_text(self, prompt, retries=2):
         """Génère une réponse textuelle avec une tolérance aux pannes maximale."""
-        if not self.model:
+        if not self.client or self.model_name_used == "aucun":
             return "Désolé, mon cerveau (IA) n'est pas encore configuré. Vérifiez la clé API !"
         
         # Paramètres de sécurité
         safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
         try:
             # Nettoyage et préparation
             safe_prompt = str(prompt).strip()
             
-            # Appel API
-            response = self.model.generate_content(
-                safe_prompt,
-                safety_settings=safety_settings
+            # Appel API avec le nouveau SDK
+            response = self.client.models.generate_content(
+                model=self.model_name_used,
+                contents=safe_prompt,
+                config=types.GenerateContentConfig(
+                    safety_settings=safety_settings
+                )
             )
             
             # Extraction sécurisée du texte
-            if response:
-                try:
-                    if hasattr(response, 'text') and response.text:
-                        return response.text
-                except:
-                    # Si .text échoue, on fouille les candidats
-                    if hasattr(response, 'candidates') and response.candidates:
-                        parts = response.candidates[0].content.parts
-                        text = "".join([p.text for p in parts if hasattr(p, 'text')])
-                        if text: return text
+            if response and response.text:
+                return response.text
             
             return "Je n'ai pas réussi à formuler une réponse. Peux-tu me poser la question autrement ?"
 
