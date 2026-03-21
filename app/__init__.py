@@ -33,7 +33,12 @@ def create_app():
     app.extensions['celery'] = celery_app
     
     # Enregistrement des blueprints
+    from .routes import main, bot
     app.register_blueprint(main)
+    
+    # Démarrage du bot WhatsApp Web en arrière-plan
+    bot.start(app)
+    print("🤖 Bot WhatsApp Web démarré.")
     
     # Configuration Webhook Telegram (si Token et APP_URL présents)
     from .routes import tg
