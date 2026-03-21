@@ -33,11 +33,11 @@ class AIHandler:
 
                 # Liste de priorité intelligente (modèles stables d'abord)
                 candidates = [
+                    'gemini-flash-latest',
+                    'gemini-pro-latest',
                     'gemini-1.5-flash',
-                    'gemini-1.5-flash-latest',
                     'gemini-2.0-flash',
                     'gemini-1.5-pro',
-                    'gemini-1.0-pro',
                     'gemma-3-27b-it',
                     'gemma-3-12b-it',
                     'gemma-3-4b-it',
