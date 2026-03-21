@@ -33,6 +33,8 @@ class AIHandler:
 
                 # Liste de priorité intelligente (modèles stables d'abord)
                 candidates = [
+                    'gemini-2.0-flash-lite-preview-09-2025',
+                    'gemini-2.0-flash-lite',
                     'gemini-flash-latest',
                     'gemini-pro-latest',
                     'gemini-1.5-flash',
@@ -44,8 +46,8 @@ class AIHandler:
                     'gemma-3-1b-it'
                 ]
                 
-                # On ne teste que les 5 premiers candidats pour gagner du temps
-                for model_name in candidates[:5]:
+                import time
+                for model_name in candidates:
                     try:
                         print(f"🔄 Validation IA : {model_name}")
                         # Test de validation minimal
@@ -58,7 +60,11 @@ class AIHandler:
                         print(f"✅ IA opérationnelle avec : {model_name}")
                         break
                     except Exception as e:
-                        print(f"❌ {model_name} indisponible (Quota/Autre)")
+                        err_msg = str(e).lower()
+                        print(f"❌ {model_name} indisponible : {err_msg[:50]}")
+                        if "429" in err_msg or "quota" in err_msg:
+                            print("⏳ Quota atteint, petite pause avant le prochain modèle...")
+                            time.sleep(2) # Pause pour laisser le quota respirer
                         self.model_name_used = "aucun"
                 
                 if self.model_name_used == "aucun":
@@ -117,38 +123,6 @@ class AIHandler:
                 return "🛡️ Désolé, ce sujet est bloqué par mes filtres de sécurité. Essayons autre chose !"
 
             return "Oups, j'ai eu un petit bug en réfléchissant. Réessaie plus tard !"
-
-    def generate_image_from_text(self, prompt):
-        """Génère une image via l'IA (Simulation améliorée ou API réelle si possible)."""
-        print(f"🎨 Requête d'image : {prompt}")
-        # En attendant une intégration Imagen complète, on utilise un service de génération plus performant
-        # On utilise Pollinations.ai qui génère de vraies images correspondant au prompt
-        encoded_prompt = prompt.replace(' ', '%20')
-        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
-        return {"status": "success", "url": image_url}
-
-    def create_sticker_from_image(self, image_url_or_path, is_from_net=True):
-        if not HAS_PILLOW:
-            return {"status": "error", "message": "Module Pillow non installé."}
-
-        try:
-            if is_from_net:
-                response = requests.get(image_url_or_path, timeout=10)
-                img = Image.open(BytesIO(response.content))
-            else:
-                img = Image.open(image_url_or_path)
-
-            img.thumbnail((512, 512))
-            output_dir = "downloads"
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-                
-            sticker_path = os.path.join(output_dir, f"sticker_{os.urandom(4).hex()}.webp")
-            img.save(sticker_path, "WEBP")
-            
-            return {"status": "success", "path": sticker_path}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
 
     def generate_image_from_text(self, prompt):
         """Génère une image via l'IA (Simulation améliorée ou API réelle si possible)."""
