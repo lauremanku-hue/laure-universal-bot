@@ -156,6 +156,37 @@ function App() {
               <div className="p-6 bg-slate-900/50 border border-indigo-500/30 rounded-3xl space-y-6 relative">
                 {selectedChannel !== 'youtube' ? (
                   <>
+                    {selectedChannel === 'whatsapp' && (
+                      <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
+                            <Share2 className="text-white" size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-widest">Connexion WhatsApp Web</h3>
+                            <p className="text-[10px] text-slate-400">Scannez ce code pour activer Laure dans vos groupes.</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl">
+                           <img 
+                             src="/qr-code-image" 
+                             alt="WhatsApp QR Code" 
+                             className="w-48 h-48"
+                             onError={(e) => {
+                               (e.target as HTMLImageElement).src = "https://placehold.co/200x200?text=Attente+QR+Code...";
+                             }}
+                           />
+                           <p className="text-[9px] text-slate-500 mt-2 italic">Le code se rafraîchit automatiquement</p>
+                        </div>
+                        
+                        <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+                          <p className="text-[10px] text-emerald-200/70 leading-relaxed">
+                            Ouvrez WhatsApp sur votre téléphone &gt; Appareils connectés &gt; Connecter un appareil.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <ConfigField 
                       label="URL DE RAPPEL" 
                       value={`${ngrokUrl}/webhook/${selectedChannel === 'telegram' ? 'telegram' : 'meta'}`} 
@@ -360,4 +391,3 @@ function ConfigField({ label, value, desc }: { label: string, value: string, des
 }
 
 export default App;
-
