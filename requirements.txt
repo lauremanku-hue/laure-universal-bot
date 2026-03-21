@@ -18,7 +18,8 @@ prompt_toolkit==3.0.52
 psycopg2-binary==2.9.10
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
-Pillow
+Pillow>=10.0.0
+protobuf>=5.26.1
 google-generativeai>=0.8.0
 gunicorn==21.2.0
 redis==7.1.0
@@ -31,7 +32,7 @@ vine==5.1.0
 wcwidth==0.5.3
 Werkzeug==3.1.5
 yt-dlp
-requests==2.31.0
-neonize
+requests>=2.31.0
+neonize>=0.0.7
 qrcode[pil]
 python-magic
