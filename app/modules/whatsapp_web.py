@@ -11,7 +11,6 @@ from .downloader import download_media
 from flask import current_app
 from app.extensions import db
 from app.models import User, MessageLog, QuizSession
-from app.routes import process_command
 
 class LaureWebBot:
     def __init__(self):
@@ -124,6 +123,7 @@ class LaureWebBot:
                     return
 
                 # Pour les autres commandes, on utilise process_command
+                from app.routes import process_command
                 resp = process_command(user, msg, 'whatsapp')
                 if resp and 'message' in resp:
                     client.reply_message(resp['message'], event)
