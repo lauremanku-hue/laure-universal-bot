@@ -1,7 +1,9 @@
 import os
 import json
 import random
-from flask import Blueprint, request, jsonify, make_response, current_app, send_from_directory
+import qrcode
+import io
+from flask import Blueprint, request, jsonify, make_response, current_app, send_from_directory, send_file
 from datetime import datetime, timedelta
 
 from .extensions import db
@@ -11,8 +13,39 @@ from .modules.telegram_handler import TelegramHandler
 from .modules.whatsapp_handler import WhatsAppHandler
 from .modules.downloader import validate_url
 from .tasks import process_download_task, schedule_auto_reply, schedule_download_task
+from .modules.whatsapp_web import LaureWebBot
 
 main = Blueprint('main', __name__)
+bot = LaureWebBot()
+
+@main.route('/qr-status')
+def qr_status():
+    return f"""
+    <div style="font-family: sans-serif; text-align: center; padding: 40px; background: #f0f2f5; min-height: 100vh;">
+        <div style="background: white; max-width: 500px; margin: 0 auto; padding: 30px; border-radius: 20px; shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h1 style="color: #128C7E;">🌟 Activation WhatsApp Laure</h1>
+            <p>Statut : <strong>{'Prêt à scanner' if bot.current_qr else 'Génération du code...'}</strong></p>
+            <div style="margin: 20px auto; padding: 20px; border: 2px solid #25D366; display: inline-block; border-radius: 20px; background: white;">
+                <img src='/qr-code-image?t={datetime.now().timestamp()}' style="width: 300px;" />
+            </div>
+            <p style="color: #666; font-size: 0.9em;">1. Ouvrez WhatsApp sur votre téléphone<br>2. Allez dans Appareils connectés<br>3. Connecter un appareil</p>
+            <button onclick="location.reload()" style="margin-top: 20px; padding: 12px 24px; background: #25D366; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold;">Actualiser la page</button>
+        </div>
+    </div>
+    """
+
+@main.route('/qr-code-image')
+def qr_code_image():
+    if not bot.current_qr:
+        # On génère un QR code d'attente
+        img = qrcode.make("En attente du bot...")
+    else:
+        img = qrcode.make(bot.current_qr)
+    
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png')
 
 @main.route('/')
 def home():
