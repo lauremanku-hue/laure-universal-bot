@@ -14,15 +14,43 @@ from app.models import User, MessageLog, QuizSession
 
 class LaureWebBot:
     def __init__(self):
-        self.client = NewClient("laure_session.db")
+        # Initialisation du client. On essaie de passer le callback QR directement si supporté.
+        try:
+            self.client = NewClient("laure_session.db", qr_callback=self.on_qr)
+        except:
+            self.client = NewClient("laure_session.db")
+        
         self.ai = AIHandler()
         self.current_qr = None
+        self.pairing_code = None
         
     def on_qr(self, client, qr_string):
         self.current_qr = qr_string
         print("\n" + "="*50)
-        print("🌟 NOUVEAU QR CODE GÉNÉRÉ 🌟")
+        print(f"🌟 NOUVEAU QR CODE : {qr_string}")
         print("="*50 + "\n")
+
+    def pair_with_phone(self, phone_number):
+        """Génère un code de couplage pour un numéro de téléphone"""
+        try:
+            # Nettoyage du numéro (doit être au format international sans +)
+            phone = phone_number.replace("+", "").replace(" ", "").strip()
+            print(f"📲 Demande de code de couplage pour : {phone}")
+            
+            # Dans neonize, la méthode est généralement PairPhone
+            if hasattr(self.client, 'PairPhone'):
+                code = self.client.PairPhone(phone)
+                self.pairing_code = code
+                return code
+            elif hasattr(self.client, 'pair_phone'):
+                code = self.client.pair_phone(phone)
+                self.pairing_code = code
+                return code
+            else:
+                return "Méthode de couplage non supportée par cette version de neonize"
+        except Exception as e:
+            print(f"❌ Erreur lors du couplage par numéro : {e}")
+            return str(e)
         
     def on_message(self, client, event: Message):
         # On ignore les messages envoyés par le bot lui-même
