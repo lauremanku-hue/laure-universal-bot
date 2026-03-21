@@ -36,9 +36,12 @@ def create_app():
     from .routes import main, bot
     app.register_blueprint(main)
     
-    # Démarrage du bot WhatsApp Web en arrière-plan
-    bot.start(app)
-    print("🤖 Bot WhatsApp Web démarré.")
+    # Démarrage du bot WhatsApp Web en arrière-plan (Thread séparé pour ne pas bloquer Gunicorn)
+    import threading
+    bot_thread = threading.Thread(target=bot.start, args=(app,))
+    bot_thread.daemon = True
+    bot_thread.start()
+    print("🤖 Bot WhatsApp Web démarré en tâche de fond.")
     
     # Configuration Webhook Telegram (si Token et APP_URL présents)
     from .routes import tg
