@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta # Ajout de timedelta
 from .extensions import db
-
+from datetime import datetime, timedelta  # <--- Ajoute timedelta ici
 
 class User(db.Model):
     __tablename__ = 'laure_user'
@@ -11,6 +11,7 @@ class User(db.Model):
     platform_id = db.Column(db.String(100), nullable=False)
     name = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    balance = db.Column(db.Float, default=0.0)
     
     # Paramètres de quota et bonus
     is_premium_member = db.Column(db.Boolean, default=False)
