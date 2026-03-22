@@ -1,6 +1,6 @@
-import os
 from .extensions import db
-from datetime import datetime, timedelta
+from datetime import datetime
+
 
 class User(db.Model):
     __tablename__ = 'laure_user'
