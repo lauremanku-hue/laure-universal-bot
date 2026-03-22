@@ -109,3 +109,4 @@ class LaureWebBot:
             self.client.connect()
         except Exception as e:
             print(f"⚠️ Erreur démarrage Bot: {e}")
+bot = LaureWebBot() 
