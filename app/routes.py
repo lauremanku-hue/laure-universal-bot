@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, render_template_string
 from .models import User, MessageLog
 from .extensions import db
 import os
+from .modules.whatsapp_web import bot 
 
 main = Blueprint('main', __name__)
 
