@@ -1,5 +1,6 @@
+import os
+from datetime import datetime, timedelta # Ajout de timedelta
 from .extensions import db
-from datetime import datetime
 
 
 class User(db.Model):
