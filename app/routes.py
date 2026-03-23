@@ -82,12 +82,14 @@ def process_command(user, msg, platform):
                 f"🌟 *MENU DE LAURE* 🌟\n"
                 f"Statut : {status}\n\n"
                 "Voici ce que je peux faire pour toi :\n"
-                "1. 🎨 *Générer une image* : Tape `/img <description>`\n"
-                "2. 🎵 *Télécharger Audio* : Tape `/audio <recherche>`\n"
-                "3. 🎓 *Aide aux Devoirs* : Envoie une photo ou tape `prof` pour activer le mode guidage.\n"
-                "4. 📚 *Quiz* : Tape `quiz` pour apprendre.\n"
-                "5. 📢 *Partager* : Tape `/partager`.\n"
-                "6. 💎 *VIP* : Tape `vip` pour t'abonner."
+                "1. 🎨 *Image IA* : `/img <description>`\n"
+                "2. 🎵 *Musique* : `/audio <recherche>`\n"
+                "3. 🎓 *Aide aux Devoirs* : Envoie une photo ou tape `prof`.\n"
+                "4. 📚 *Quiz Avancé* : `quiz <sujet>` (ex: `quiz histoire`)\n"
+                "5. 🤔 *Devinette* : Tape `devinette`.\n"
+                "6. 📅 *Programmer un Cours* : `/programme_cours Titre | HH:MM | Jour(0-6)`\n"
+                "7. 📢 *Partager* : `/partager`.\n"
+                "8. 💎 *VIP* : `vip` pour t'abonner."
             )
         }
 
@@ -130,23 +132,69 @@ def process_command(user, msg, platform):
             )
         }
     
-    if clean_msg == 'quiz':
-        # Create a new quiz session
-        session = QuizSession(group_id=user.platform_id, status='active', responses='{}')
+    if clean_msg == 'devinette':
+        from app.modules.ai_handler import AIHandler
+        ai = AIHandler()
+        riddle = ai.get_riddle()
+        # On stocke la réponse attendue dans une session temporaire ou on utilise un format spécifique
+        return {
+            "message": f"🤔 *DEVINETTE* :\n\n{riddle['question']}\n\n(Réponds pour voir si tu as juste !)"
+        }
+
+    if clean_msg.startswith('quiz '):
+        topic = msg.split(' ', 1)[1]
+        from app.modules.ai_handler import AIHandler
+        ai = AIHandler()
+        questions = ai.generate_quiz_questions(topic, count=20)
+        if not questions:
+            return {"message": "Désolé, je n'ai pas pu générer de quiz sur ce sujet."}
+        
+        session = QuizSession(
+            group_id=user.platform_id, 
+            status='active', 
+            questions_data=json.dumps(questions),
+            responses='[]',
+            current_question_index=0,
+            total_questions=len(questions),
+            correct_answers_count=0
+        )
         db.session.add(session)
         db.session.commit()
+        
+        q = questions[0]
         return {
             "message": (
-                "📚 *QUIZ LAURE* 📚\n\n"
-                "C'est parti ! Voici ta première question :\n\n"
-                "Quel est le plus grand pays du monde ?\n"
-                "A) Canada\n"
-                "B) Russie\n"
-                "C) Chine\n"
-                "D) USA\n\n"
-                "Réponds par la lettre correspondante (A, B, C ou D)."
+                f"📚 *QUIZ : {topic.upper()}* (1/{len(questions)})\n\n"
+                f"{q['q']}\n\n"
+                f"A) {q['a']}\n"
+                f"B) {q['b']}\n"
+                f"C) {q['c']}\n"
+                f"D) {q['d']}\n\n"
+                "Réponds par A, B, C ou D."
             )
         }
+
+    if clean_msg.startswith('/programme_cours '):
+        # Format: /programme_cours Titre | HH:MM | Jour(0-6)
+        try:
+            parts = msg.split(' ', 1)[1].split('|')
+            title = parts[0].strip()
+            time_str = parts[1].strip()
+            day = int(parts[2].strip())
+            
+            from .models import ScheduledCourse
+            new_course = ScheduledCourse(
+                user_id=user.id,
+                title=title,
+                target_jid=user.platform_id, # Par défaut au JID de l'utilisateur
+                day_of_week=day,
+                scheduled_time=time_str
+            )
+            db.session.add(new_course)
+            db.session.commit()
+            return {"message": f"✅ Cours sur *{title}* programmé pour chaque {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'][day]} à {time_str} !"}
+        except:
+            return {"message": "❌ Format invalide. Utilise : `/programme_cours Titre | HH:MM | Jour(0-6)`"}
 
     if clean_msg == 'payer':
         # Placeholder for Monetbil Service ID
