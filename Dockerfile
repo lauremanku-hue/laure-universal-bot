@@ -1,36 +1,26 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
-# Install system dependencies
+# Installer les dépendances système nécessaires pour neonize et sqlite
 RUN apt-get update && apt-get install -y \
-    libmagic1 \
-    libmagic-dev \
-    ffmpeg \
+    sqlite3 \
+    libsqlite3-dev \
+    ca-certificates \
     curl \
-    gnupg \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js (for Vite build)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs
 
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY package*.json ./
-RUN npm install
+# Copier les fichiers de dépendances
+COPY requirements.txt .
 
-# Copy requirements and install python dependencies
-COPY requirements.txt ./
+# Installer les dépendances Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Copier le reste du code
 COPY . .
 
-# Build the frontend
-RUN npm run build
-
-# Expose the port Railway uses
+# Exposer le port 3000
 EXPOSE 3000
 
-# Command to run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:3000", "laure_web_launcher:app"]
+# Commande de démarrage
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:3000", "--timeout", "600", "--workers", "1", "--threads", "8"]
