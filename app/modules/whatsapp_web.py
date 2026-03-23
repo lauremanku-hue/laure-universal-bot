@@ -72,6 +72,32 @@ class LaureWebBot:
         self.current_qr = qr_string
         print(f"\n🌟 NOUVEAU QR CODE : {qr_string}\n")
 
+    def get_pairing_code(self, phone_number):
+        """Génère un code de couplage pour un numéro de téléphone."""
+        try:
+            # Nettoyage du numéro (doit être au format international sans +)
+            phone = "".join(filter(str.isdigit, phone_number))
+            print(f"📲 Demande de code de couplage pour : {phone}")
+            
+            # Dans neonize, la méthode peut varier selon la version
+            if hasattr(self.client, 'pair_with_code'):
+                code = self.client.pair_with_code(phone)
+            elif hasattr(self.client, 'PairWithCode'):
+                code = self.client.PairWithCode(phone)
+            else:
+                # Fallback si la méthode n'est pas directement sur le client
+                # Certaines versions utilisent client.PairWithCode(phone)
+                try:
+                    code = self.client.PairWithCode(phone)
+                except:
+                    return {"status": "error", "message": "Méthode de couplage non supportée par cette version de neonize."}
+            
+            self.pairing_code = code
+            return {"status": "success", "code": code}
+        except Exception as e:
+            print(f"❌ Erreur pairing code : {e}")
+            return {"status": "error", "message": str(e)}
+
     def on_message(self, client, event: Message):
         if event.Info.IsFromMe: return
 
