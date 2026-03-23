@@ -8,15 +8,16 @@ main = Blueprint('main', __name__)
 
 @main.route('/')
 def index():
-    from flask import current_app
+    from flask import current_app, request
     import qrcode
     import io
     import base64
     
     bot = getattr(current_app, 'bot', None)
     qr_img_base64 = None
+    pairing_code = getattr(bot, 'pairing_code', None) if bot else None
     
-    if bot and bot.current_qr:
+    if bot and bot.current_qr and not pairing_code:
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
         qr.add_data(bot.current_qr)
         qr.make(fit=True)
@@ -32,68 +33,97 @@ def index():
     <head>
         <title>Laure Bot Status</title>
         <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 50px; background: #f0f2f5; color: #1c1e21; }
-            .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); display: inline-block; max-width: 500px; width: 100%; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; color: #1c1e21; }
+            .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); display: inline-block; max-width: 500px; width: 100%; }
             h1 { color: #25d366; margin-bottom: 10px; }
-            .status { font-size: 1.2em; margin-bottom: 20px; }
-            .qr-container { margin: 30px 0; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 10px; }
+            .status { font-size: 1.1em; margin-bottom: 20px; }
+            .qr-container { margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 10px; }
             .qr-image { max-width: 100%; height: auto; }
-            .instructions { text-align: left; background: #e7f3ff; padding: 15px; border-radius: 8px; font-size: 0.9em; }
-            .footer { margin-top: 30px; color: #65676b; font-size: 0.8em; }
-            .btn { background: #25d366; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 20px; font-weight: bold; }
+            .pairing-box { background: #e7f3ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 2px solid #007bff; }
+            .pairing-code { font-size: 2.5em; font-weight: bold; letter-spacing: 5px; color: #007bff; margin: 10px 0; }
+            .instructions { text-align: left; background: #f8f9fa; padding: 15px; border-radius: 8px; font-size: 0.9em; margin-top: 20px; }
+            .footer { margin-top: 20px; color: #65676b; font-size: 0.8em; }
+            .btn { background: #25d366; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 10px; font-weight: bold; border: none; cursor: pointer; }
+            .btn-blue { background: #007bff; }
+            input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; width: 70%; margin-bottom: 10px; }
         </style>
-        <meta http-equiv="refresh" content="10">
+        {% if not pairing_code %}
+        <meta http-equiv="refresh" content="15">
+        {% endif %}
     </head>
     <body>
         <div class="card">
             <h1>🌟 Laure Bot</h1>
             <div class="status">
-                {% if qr_img_base64 %}
+                {% if pairing_code %}
+                    <span style="color: #007bff;">📲 Code de couplage généré</span>
+                {% elif qr_img_base64 %}
                     <span style="color: #e4a11b;">⏳ En attente de connexion...</span>
                 {% else %}
                     <span style="color: #25d366;">✅ Bot Connecté & Prêt</span>
                 {% endif %}
             </div>
             
-            <p>Connectez Laure à votre WhatsApp pour transformer votre expérience !</p>
-            
-            <div class="qr-container">
-                {% if qr_img_base64 %}
+            {% if pairing_code %}
+                <div class="pairing-box">
+                    <p>Votre code de couplage :</p>
+                    <div class="pairing-code">{{ pairing_code }}</div>
+                    <p><small>Saisissez ce code sur votre téléphone.</small></p>
+                </div>
+            {% elif qr_img_base64 %}
+                <div class="qr-container">
                     <img src="data:image/png;base64,{{ qr_img_base64 }}" class="qr-image" alt="WhatsApp QR Code">
-                    <p><strong>Scannez ce code avec votre téléphone</strong></p>
-                {% else %}
-                    <div style="padding: 20px; color: #25d366;">
-                        <p style="font-size: 3em;">🚀</p>
-                        <p><strong>Laure est en ligne !</strong></p>
-                        <p><small>Vous pouvez maintenant l'utiliser sur WhatsApp.</small></p>
-                    </div>
-                {% endif %}
-            </div>
+                    <p><strong>Scannez le QR Code</strong></p>
+                </div>
+                
+                <div style="margin: 20px 0; border-top: 1px solid #eee; padding-top: 20px;">
+                    <p><strong>OU connectez-vous par numéro :</strong></p>
+                    <form action="/pair" method="POST">
+                        <input type="text" name="phone" placeholder="Ex: 237690000000" required>
+                        <button type="submit" class="btn btn-blue">Recevoir un code</button>
+                    </form>
+                </div>
+            {% else %}
+                <div style="padding: 20px; color: #25d366;">
+                    <p style="font-size: 3em;">🚀</p>
+                    <p><strong>Laure est en ligne !</strong></p>
+                </div>
+            {% endif %}
 
-            <div class="features-list" style="text-align: left; margin-bottom: 20px;">
-                <h3 style="color: #25d366;">🚀 Fonctionnalités Clés :</h3>
-                <ul style="list-style: none; padding: 0;">
-                    <li>📸 <strong>Analyse d'Images</strong> : Aide aux devoirs via photo.</li>
-                    <li>🎨 <strong>Génération d'Images</strong> : Créez des visuels par texte.</li>
-                    <li>🎵 <strong>Multimédia</strong> : Téléchargement Audio et Vidéo.</li>
-                    <li>🧠 <strong>IA Avancée</strong> : Discussion fluide et intelligente.</li>
-                </ul>
+            <div class="instructions">
+                <strong>Comment utiliser le code ?</strong>
+                <ol>
+                    <li>Ouvrez WhatsApp > <strong>Appareils connectés</strong>.</li>
+                    <li>Appuyez sur <strong>Connecter un appareil</strong>.</li>
+                    <li>Appuyez sur <strong>"Connecter avec le numéro de téléphone"</strong> en bas.</li>
+                    <li>Saisissez le code affiché ci-dessus.</li>
+                </ol>
             </div>
             
-            <div class="instructions" style="margin-bottom: 20px;">
-                <strong>📢 Modèle de Pub :</strong><br>
-                <small style="color: #666;">"Découvre Laure, l'IA WhatsApp qui t'aide pour tes devoirs et crée tes images ! Test gratuit ici : wa.me/VOTRE_NUMERO"</small>
-            </div>
-            
-            <a href="/" class="btn">Actualiser la page</a>
+            <a href="/" class="btn">Actualiser</a>
             
             <div class="footer">
-                Propulsé par Neonize & Gemini AI | Laure Bot v1.0
+                Propulsé par Neonize & Gemini AI | Laure Bot v1.1
             </div>
         </div>
     </body>
     </html>
-    """, qr_img_base64=qr_img_base64)
+    """, qr_img_base64=qr_img_base64, pairing_code=pairing_code)
+
+@main.route('/pair', methods=['POST'])
+def pair_with_phone():
+    from flask import current_app, redirect, url_for, request, flash
+    phone = request.form.get('phone')
+    bot = getattr(current_app, 'bot', None)
+    
+    if bot and phone:
+        res = bot.get_pairing_code(phone)
+        if res['status'] == 'success':
+            return redirect(url_for('main.index'))
+        else:
+            return f"Erreur : {res['message']}. <a href='/'>Retour</a>"
+    
+    return redirect(url_for('main.index'))
 
 @main.route('/api/monetbil/webhook', methods=['POST'])
 def monetbil_webhook():
