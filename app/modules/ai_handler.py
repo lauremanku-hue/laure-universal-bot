@@ -113,3 +113,33 @@ class AIHandler:
                 'status': 'success',
                 'url': image_url
             }
+
+    def get_riddle(self):
+        """Génère une devinette avec sa réponse."""
+        prompt = "Génère une devinette amusante et éducative pour WhatsApp. Donne la devinette et la réponse séparément dans un format JSON : {\"question\": \"...\", \"reponse\": \"...\"}"
+        try:
+            response = self.text_model.generate_content(prompt)
+            # On nettoie la réponse pour extraire le JSON
+            text = response.text.replace("```json", "").replace("```", "").strip()
+            return json.loads(text)
+        except:
+            return {"question": "Je suis grand quand je suis jeune et petit quand je suis vieux. Qui suis-je ?", "reponse": "Une bougie"}
+
+    def generate_course_content(self, title):
+        """Génère un contenu de cours complet et structuré sur un titre donné."""
+        prompt = f"Rédige un cours structuré, clair et pédagogique sur le thème : '{title}'. Utilise des emojis, des points clés et une conclusion. Le cours doit être adapté pour une lecture sur WhatsApp."
+        try:
+            response = self.text_model.generate_content(prompt)
+            return response.text
+        except:
+            return f"Désolé, je n'ai pas pu préparer le cours sur '{title}' pour le moment."
+
+    def generate_quiz_questions(self, topic, count=20):
+        """Génère une liste de questions de quiz sur un sujet donné."""
+        prompt = f"Génère {count} questions de quiz à choix multiples (A, B, C, D) sur le thème : '{topic}'. Pour chaque question, indique la bonne réponse. Format JSON : [{\"q\": \"...\", \"a\": \"...\", \"b\": \"...\", \"c\": \"...\", \"d\": \"...\", \"correct\": \"A\"}, ...]"
+        try:
+            response = self.text_model.generate_content(prompt)
+            text = response.text.replace("```json", "").replace("```", "").strip()
+            return json.loads(text)
+        except:
+            return []
