@@ -1,3 +1,4 @@
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 import os
@@ -26,7 +27,27 @@ class LaureWebBot:
         self.pairing_code = None
         self.scheduler = BackgroundScheduler()
         self.scheduler.add_job(self.send_reminders, 'interval', hours=12)
+        self.scheduler.add_job(self.send_scheduled_courses, 'interval', minutes=1)
         self.scheduler.start()
+        
+    def send_scheduled_courses(self):
+        """Envoie les cours programmés à l'heure prévue."""
+        if not hasattr(self, 'app'): return
+        with self.app.app_context():
+            now = datetime.utcnow()
+            current_time = now.strftime("%H:%M")
+            current_day = now.weekday()
+            
+            from .models import ScheduledCourse
+            courses = ScheduledCourse.query.filter_by(
+                day_of_week=current_day, 
+                scheduled_time=current_time, 
+                is_active=True
+            ).all()
+            
+            for course in courses:
+                content = self.ai.generate_course_content(course.title)
+                self.client.send_message(course.target_jid, f"📚 *COURS DU JOUR : {course.title.upper()}*\n\n{content}")
         
     def send_reminders(self):
         """Envoie des rappels aux utilisateurs inactifs ou ayant un quiz en cours."""
@@ -103,6 +124,47 @@ class LaureWebBot:
                     return
 
                 clean_msg = msg.lower().strip() if msg else ""
+
+                # Gestion des Quiz en cours
+                session = QuizSession.query.filter_by(group_id=sender_id, status='active').first()
+                if session and clean_msg in ['a', 'b', 'c', 'd']:
+                    questions = json.loads(session.questions_data)
+                    current_q = questions[session.current_question_index]
+                    
+                    # Vérification de la réponse
+                    is_correct = clean_msg.upper() == current_q['correct'].upper()
+                    if is_correct:
+                        session.correct_answers_count += 1
+                    
+                    session.current_question_index += 1
+                    
+                    if session.current_question_index >= session.total_questions:
+                        # Fin du quiz - Stats
+                        session.status = 'completed'
+                        pct = (session.correct_answers_count / session.total_questions) * 100
+                        report = (
+                            f"🏁 *QUIZ TERMINÉ !*\n\n"
+                            f"📊 *STATS* :\n"
+                            f"- Total : {session.total_questions}\n"
+                            f"- Justes : {session.correct_answers_count}\n"
+                            f"- Fausses : {session.total_questions - session.correct_answers_count}\n"
+                            f"- Score : {pct:.1f}%\n\n"
+                            f"💡 *CORRECTION* : Révise les points où tu as hésité !"
+                        )
+                        client.reply_message(report, event)
+                    else:
+                        # Question suivante
+                        next_q = questions[session.current_question_index]
+                        client.reply_message(
+                            f"📚 *QUESTION {session.current_question_index + 1}/{session.total_questions}*\n\n"
+                            f"{next_q['q']}\n\n"
+                            f"A) {next_q['a']}\n"
+                            f"B) {next_q['b']}\n"
+                            f"C) {next_q['c']}\n"
+                            f"D) {next_q['d']}", event
+                        )
+                    db.session.commit()
+                    return
 
                 # Commandes spécifiques
                 if clean_msg == 'prof':
