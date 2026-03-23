@@ -18,4 +18,6 @@ bot_thread = threading.Thread(target=start_bot, daemon=True)
 bot_thread.start()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3000)
+    import os
+    port = int(os.environ.get("PORT", 3000))
+    app.run(host="0.0.0.0", port=port)
