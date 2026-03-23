@@ -1,2 +1,1 @@
-web: gunicorn --bind 0.0.0.0:3000 laure_web_launcher:app
-worker: celery -A celery_worker.celery_app worker --loglevel=info
+web: gunicorn wsgi:app --bind 0.0.0.0:3000 --timeout 600 --workers 1 --threads 8
