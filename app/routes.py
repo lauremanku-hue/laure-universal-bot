@@ -1,31 +1,33 @@
-from flask import Blueprint, jsonify, request, render_template_string
+import os
+import json
+import qrcode
+import io
+import base64
+from flask import Blueprint, jsonify, request, render_template_string, current_app
 from .models import User, MessageLog, QuizSession
 from .extensions import db
 from datetime import datetime, timedelta
-import os
 
 main = Blueprint('main', __name__)
 
 @main.route('/')
 def index():
-    from flask import current_app, request
-    import qrcode
-    import io
-    import base64
-    
     bot = getattr(current_app, 'bot', None)
     qr_img_base64 = None
     pairing_code = getattr(bot, 'pairing_code', None) if bot else None
     
     if bot and bot.current_qr and not pairing_code:
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(bot.current_qr)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
-        qr_img_base64 = base64.b64encode(buffered.getvalue()).decode()
+        try:
+            qr = qrcode.QRCode(version=1, box_size=10, border=5)
+            qr.add_data(bot.current_qr)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            buffered = io.BytesIO()
+            img.save(buffered, format="PNG")
+            qr_img_base64 = base64.b64encode(buffered.getvalue()).decode()
+        except Exception as e:
+            print(f"⚠️ Erreur génération image QR : {e}")
     
     return render_template_string("""
     <!DOCTYPE html>
