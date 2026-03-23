@@ -51,32 +51,38 @@ def index():
                 {% if qr_img_base64 %}
                     <span style="color: #e4a11b;">⏳ En attente de connexion...</span>
                 {% else %}
-                    <span style="color: #25d366;">✅ Bot Initialisé</span>
+                    <span style="color: #25d366;">✅ Bot Connecté & Prêt</span>
                 {% endif %}
             </div>
             
-            <p>Connectez Laure à votre WhatsApp pour commencer l'aventure !</p>
+            <p>Connectez Laure à votre WhatsApp pour transformer votre expérience !</p>
             
             <div class="qr-container">
                 {% if qr_img_base64 %}
                     <img src="data:image/png;base64,{{ qr_img_base64 }}" class="qr-image" alt="WhatsApp QR Code">
                     <p><strong>Scannez ce code avec votre téléphone</strong></p>
                 {% else %}
-                    <div style="padding: 40px; color: #888;">
-                        <p>Génération du QR code en cours ou déjà connecté...</p>
-                        <p><small>Si vous êtes déjà connecté, vous pouvez fermer cette page.</small></p>
+                    <div style="padding: 20px; color: #25d366;">
+                        <p style="font-size: 3em;">🚀</p>
+                        <p><strong>Laure est en ligne !</strong></p>
+                        <p><small>Vous pouvez maintenant l'utiliser sur WhatsApp.</small></p>
                     </div>
                 {% endif %}
             </div>
+
+            <div class="features-list" style="text-align: left; margin-bottom: 20px;">
+                <h3 style="color: #25d366;">🚀 Fonctionnalités Clés :</h3>
+                <ul style="list-style: none; padding: 0;">
+                    <li>📸 <strong>Analyse d'Images</strong> : Aide aux devoirs via photo.</li>
+                    <li>🎨 <strong>Génération d'Images</strong> : Créez des visuels par texte.</li>
+                    <li>🎵 <strong>Multimédia</strong> : Téléchargement Audio et Vidéo.</li>
+                    <li>🧠 <strong>IA Avancée</strong> : Discussion fluide et intelligente.</li>
+                </ul>
+            </div>
             
-            <div class="instructions">
-                <strong>Comment faire ?</strong>
-                <ol>
-                    <li>Ouvrez WhatsApp sur votre téléphone.</li>
-                    <li>Allez dans <strong>Réglages</strong> > <strong>Appareils connectés</strong>.</li>
-                    <li>Appuyez sur <strong>Connecter un appareil</strong>.</li>
-                    <li>Scannez le code QR affiché ci-dessus.</li>
-                </ol>
+            <div class="instructions" style="margin-bottom: 20px;">
+                <strong>📢 Modèle de Pub :</strong><br>
+                <small style="color: #666;">"Découvre Laure, l'IA WhatsApp qui t'aide pour tes devoirs et crée tes images ! Test gratuit ici : wa.me/VOTRE_NUMERO"</small>
             </div>
             
             <a href="/" class="btn">Actualiser la page</a>
