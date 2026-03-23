@@ -19,7 +19,7 @@ def index():
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Laure Bot - Connexion v1.2.1</title>
+        <title>LAURE BOT - CONNEXION PAR NUMÉRO (SANS QR CODE)</title>
         <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; color: #1c1e21; }
             .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: inline-block; max-width: 450px; width: 100%; margin-top: 50px; }
