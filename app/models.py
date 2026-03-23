@@ -44,5 +44,19 @@ class QuizSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     group_id = db.Column(db.String(100))
     status = db.Column(db.String(50)) # 'active', 'completed'
-    responses = db.Column(db.Text) # JSON string
+    current_question_index = db.Column(db.Integer, default=0)
+    total_questions = db.Column(db.Integer, default=20)
+    correct_answers_count = db.Column(db.Integer, default=0)
+    questions_data = db.Column(db.Text) # JSON string of questions and correct answers
+    responses = db.Column(db.Text) # JSON string of user answers
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class ScheduledCourse(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    title = db.Column(db.String(200))
+    target_jid = db.Column(db.String(100)) # Group or User JID
+    day_of_week = db.Column(db.Integer) # 0-6 (Mon-Sun)
+    scheduled_time = db.Column(db.String(10)) # "HH:MM"
+    is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
