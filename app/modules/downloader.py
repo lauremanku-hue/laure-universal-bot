@@ -1,20 +1,6 @@
 import os
 import yt_dlp
-import uuid
-import re
-
-def validate_url(url):
-    """
-    Vérifie si une chaîne est une URL valide.
-    """
-    regex = re.compile(
-        r'^(?:http|ftp)s?://' # http:// ou https://
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|' # domaine
-        r'localhost|' # localhost
-        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})' # ou ip
-        r'(?::\d+)?' # port optionnel
-        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
-    return re.match(regex, url) is not None
+import 
 
 def download_media(query, is_audio=True):
     """
@@ -72,5 +58,3 @@ def download_media(query, is_audio=True):
             'status': 'error',
             'message': f"Erreur lors du téléchargement : {str(e)}"
         }
-
- 
