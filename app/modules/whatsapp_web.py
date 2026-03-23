@@ -1,4 +1,3 @@
-
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 import os
@@ -18,12 +17,11 @@ from app.models import User, MessageLog, QuizSession
 class LaureWebBot:
     def __init__(self):
         try:
-            self.client = NewClient("laure_session.db", qr_callback=self.on_qr)
+            self.client = NewClient("laure_session.db")
         except:
             self.client = NewClient("laure_session.db") 
 
         self.ai = AIHandler()
-        self.current_qr = None
         self.pairing_code = None
         self.scheduler = BackgroundScheduler()
         self.scheduler.add_job(self.send_reminders, 'interval', hours=12)
@@ -262,16 +260,7 @@ class LaureWebBot:
 
     def start(self, app=None):
         self.app = app
-        # Enregistrement du callback QR
-        try:
-            if hasattr(self.client, 'on_qr'):
-                self.client.on_qr(self.on_qr)
-            elif hasattr(self.client, 'qr_callback'):
-                self.client.qr_callback(self.on_qr)
-        except Exception as e:
-            print(f"⚠️ Erreur lors de l'enregistrement du callback QR : {e}")
-
-        # Note: QRCallback n'existe plus dans les versions récentes de neonize.
+        
         # On utilise une méthode de détection dynamique pour enregistrer le gestionnaire de messages
         # car l'API de neonize peut varier selon la version installée.
         try:
