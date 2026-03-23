@@ -79,7 +79,7 @@ def index():
             <a href="/" style="display:block; margin-top:20px; color:#666; text-decoration:none; font-size:0.9em;">🔄 Actualiser la page</a>
             
             <div class="footer">
-                Laure Bot v1.2.1 | Propulsé par Neonize
+                Laure Bot v1.2.2 | Propulsé par Neonize
             </div>
         </div>
     </body>
