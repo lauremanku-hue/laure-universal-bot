@@ -14,11 +14,12 @@ def index():
     bot = getattr(current_app, 'bot', None)
     pairing_code = getattr(bot, 'pairing_code', None) if bot else None
     
-    return render_template_string("""
+    from flask import make_response
+    resp = make_response(render_template_string("""
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Laure Bot - Connexion</title>
+        <title>Laure Bot - Connexion v1.2.1</title>
         <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; color: #1c1e21; }
             .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: inline-block; max-width: 450px; width: 100%; margin-top: 50px; }
@@ -78,12 +79,16 @@ def index():
             <a href="/" style="display:block; margin-top:20px; color:#666; text-decoration:none; font-size:0.9em;">🔄 Actualiser la page</a>
             
             <div class="footer">
-                Laure Bot v1.2 | Propulsé par Neonize
+                Laure Bot v1.2.1 | Propulsé par Neonize
             </div>
         </div>
     </body>
     </html>
-    """, pairing_code=pairing_code)
+    """, pairing_code=pairing_code))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 @main.route('/pair', methods=['POST'])
 def pair_with_phone():
