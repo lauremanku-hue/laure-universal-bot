@@ -1,6 +1,5 @@
 import os
 import json
-import qrcode
 import io
 import base64
 from flask import Blueprint, jsonify, request, render_template_string, current_app
@@ -13,104 +12,78 @@ main = Blueprint('main', __name__)
 @main.route('/')
 def index():
     bot = getattr(current_app, 'bot', None)
-    qr_img_base64 = None
     pairing_code = getattr(bot, 'pairing_code', None) if bot else None
-    
-    if bot and bot.current_qr and not pairing_code:
-        try:
-            qr = qrcode.QRCode(version=1, box_size=10, border=5)
-            qr.add_data(bot.current_qr)
-            qr.make(fit=True)
-            img = qr.make_image(fill_color="black", back_color="white")
-            
-            buffered = io.BytesIO()
-            img.save(buffered, format="PNG")
-            qr_img_base64 = base64.b64encode(buffered.getvalue()).decode()
-        except Exception as e:
-            print(f"⚠️ Erreur génération image QR : {e}")
     
     return render_template_string("""
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Laure Bot Status</title>
+        <title>Laure Bot - Connexion</title>
         <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; color: #1c1e21; }
-            .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); display: inline-block; max-width: 500px; width: 100%; }
-            h1 { color: #25d366; margin-bottom: 10px; }
-            .status { font-size: 1.1em; margin-bottom: 20px; }
-            .qr-container { margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 10px; }
-            .qr-image { max-width: 100%; height: auto; }
-            .pairing-box { background: #e7f3ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 2px solid #007bff; }
-            .pairing-code { font-size: 2.5em; font-weight: bold; letter-spacing: 5px; color: #007bff; margin: 10px 0; }
-            .instructions { text-align: left; background: #f8f9fa; padding: 15px; border-radius: 8px; font-size: 0.9em; margin-top: 20px; }
-            .footer { margin-top: 20px; color: #65676b; font-size: 0.8em; }
-            .btn { background: #25d366; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 10px; font-weight: bold; border: none; cursor: pointer; }
+            .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: inline-block; max-width: 450px; width: 100%; margin-top: 50px; }
+            h1 { color: #25d366; margin-bottom: 20px; font-size: 2.2em; }
+            .status-badge { padding: 8px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9em; display: inline-block; margin-bottom: 25px; }
+            .status-waiting { background: #fff3cd; color: #856404; }
+            .status-connected { background: #d4edda; color: #155724; }
+            .status-pairing { background: #cce5ff; color: #004085; }
+            
+            .pairing-box { background: #f8f9fa; padding: 30px; border-radius: 15px; margin: 25px 0; border: 2px dashed #007bff; }
+            .pairing-code { font-size: 3em; font-weight: 900; letter-spacing: 8px; color: #007bff; margin: 15px 0; font-family: monospace; }
+            
+            .input-group { margin: 30px 0; }
+            input { padding: 15px; border-radius: 10px; border: 2px solid #ddd; width: 80%; font-size: 1.1em; outline: none; transition: border-color 0.3s; }
+            input:focus { border-color: #25d366; }
+            
+            .btn { background: #25d366; color: white; padding: 15px 30px; border-radius: 10px; text-decoration: none; display: inline-block; font-weight: bold; border: none; cursor: pointer; font-size: 1.1em; width: 80%; margin-top: 10px; transition: transform 0.2s; }
+            .btn:active { transform: scale(0.98); }
             .btn-blue { background: #007bff; }
-            input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; width: 70%; margin-bottom: 10px; }
+            
+            .instructions { text-align: left; background: #fff; padding: 20px; border-radius: 12px; font-size: 0.95em; margin-top: 30px; border: 1px solid #eee; }
+            .footer { margin-top: 40px; color: #888; font-size: 0.85em; }
         </style>
-        {% if not pairing_code %}
-        <meta http-equiv="refresh" content="15">
-        {% endif %}
     </head>
     <body>
         <div class="card">
             <h1>🌟 Laure Bot</h1>
-            <div class="status">
-                {% if pairing_code %}
-                    <span style="color: #007bff;">📲 Code de couplage généré</span>
-                {% elif qr_img_base64 %}
-                    <span style="color: #e4a11b;">⏳ En attente de connexion...</span>
-                {% else %}
-                    <span style="color: #25d366;">✅ Bot Connecté & Prêt</span>
-                {% endif %}
-            </div>
             
             {% if pairing_code %}
+                <div class="status-badge status-pairing">📲 Code de couplage prêt</div>
                 <div class="pairing-box">
-                    <p>Votre code de couplage :</p>
+                    <p>Entrez ce code sur votre WhatsApp :</p>
                     <div class="pairing-code">{{ pairing_code }}</div>
-                    <p><small>Saisissez ce code sur votre téléphone.</small></p>
-                </div>
-            {% elif qr_img_base64 %}
-                <div class="qr-container">
-                    <img src="data:image/png;base64,{{ qr_img_base64 }}" class="qr-image" alt="WhatsApp QR Code">
-                    <p><strong>Scannez le QR Code</strong></p>
-                </div>
-                
-                <div style="margin: 20px 0; border-top: 1px solid #eee; padding-top: 20px;">
-                    <p><strong>OU connectez-vous par numéro :</strong></p>
-                    <form action="/pair" method="POST">
-                        <input type="text" name="phone" placeholder="Ex: 237690000000" required>
-                        <button type="submit" class="btn btn-blue">Recevoir un code</button>
-                    </form>
+                    <p><small>Le code expire dans quelques minutes.</small></p>
                 </div>
             {% else %}
-                <div style="padding: 20px; color: #25d366;">
-                    <p style="font-size: 3em;">🚀</p>
-                    <p><strong>Laure est en ligne !</strong></p>
-                </div>
+                <div class="status-badge status-waiting">⏳ En attente de connexion</div>
+                <p>Connectez Laure à votre numéro WhatsApp pour commencer.</p>
+                
+                <form action="/pair" method="POST" class="input-group">
+                    <input type="text" name="phone" placeholder="Ex: 237690000000" required>
+                    <button type="submit" class="btn btn-blue">Générer mon code</button>
+                </form>
             {% endif %}
 
             <div class="instructions">
-                <strong>Comment utiliser le code ?</strong>
-                <ol>
-                    <li>Ouvrez WhatsApp > <strong>Appareils connectés</strong>.</li>
+                <strong>💡 Comment se connecter ?</strong>
+                <ol style="padding-left: 20px; margin-top: 10px;">
+                    <li>Ouvrez WhatsApp sur votre téléphone.</li>
+                    <li>Allez dans <strong>Appareils connectés</strong>.</li>
                     <li>Appuyez sur <strong>Connecter un appareil</strong>.</li>
-                    <li>Appuyez sur <strong>"Connecter avec le numéro de téléphone"</strong> en bas.</li>
+                    <li>Appuyez sur <strong>"Connecter avec le numéro de téléphone"</strong> (en bas).</li>
                     <li>Saisissez le code affiché ci-dessus.</li>
                 </ol>
             </div>
             
-            <a href="/" class="btn">Actualiser</a>
+            <a href="/" style="display:block; margin-top:20px; color:#666; text-decoration:none; font-size:0.9em;">🔄 Actualiser la page</a>
             
             <div class="footer">
-                Propulsé par Neonize & Gemini AI | Laure Bot v1.1
+                Laure Bot v1.2 | Propulsé par Neonize
             </div>
         </div>
     </body>
     </html>
-    """, qr_img_base64=qr_img_base64, pairing_code=pairing_code)
+    """, pairing_code=pairing_code)
 
 @main.route('/pair', methods=['POST'])
 def pair_with_phone():
