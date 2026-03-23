@@ -8,35 +8,86 @@ main = Blueprint('main', __name__)
 
 @main.route('/')
 def index():
-    # We'll try to get the bot instance from the current_app if we can find it
-    # But for now, let's just show a status page
+    from flask import current_app
+    import qrcode
+    import io
+    import base64
+    
+    bot = getattr(current_app, 'bot', None)
+    qr_img_base64 = None
+    
+    if bot and bot.current_qr:
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(bot.current_qr)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        qr_img_base64 = base64.b64encode(buffered.getvalue()).decode()
+    
     return render_template_string("""
     <!DOCTYPE html>
     <html>
     <head>
         <title>Laure Bot Status</title>
         <style>
-            body { font-family: sans-serif; text-align: center; padding: 50px; background: #f4f4f9; }
-            .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; }
-            h1 { color: #25d366; }
-            .status { font-weight: bold; color: #555; }
-            .qr-placeholder { margin: 20px; border: 2px dashed #ccc; padding: 20px; color: #888; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 50px; background: #f0f2f5; color: #1c1e21; }
+            .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); display: inline-block; max-width: 500px; width: 100%; }
+            h1 { color: #25d366; margin-bottom: 10px; }
+            .status { font-size: 1.2em; margin-bottom: 20px; }
+            .qr-container { margin: 30px 0; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 10px; }
+            .qr-image { max-width: 100%; height: auto; }
+            .instructions { text-align: left; background: #e7f3ff; padding: 15px; border-radius: 8px; font-size: 0.9em; }
+            .footer { margin-top: 30px; color: #65676b; font-size: 0.8em; }
+            .btn { background: #25d366; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 20px; font-weight: bold; }
         </style>
+        <meta http-equiv="refresh" content="10">
     </head>
     <body>
         <div class="card">
             <h1>🌟 Laure Bot</h1>
-            <p class="status">Statut : <span style="color: green;">En ligne</span></p>
-            <p>Le bot WhatsApp est en cours d'exécution.</p>
-            <div class="qr-placeholder">
-                <p>Si vous n'êtes pas encore connecté, consultez les logs pour le QR code ou le code de couplage.</p>
+            <div class="status">
+                {% if qr_img_base64 %}
+                    <span style="color: #e4a11b;">⏳ En attente de connexion...</span>
+                {% else %}
+                    <span style="color: #25d366;">✅ Bot Initialisé</span>
+                {% endif %}
             </div>
-            <hr>
-            <p><small>Propulsé par Neonize & Gemini AI</small></p>
+            
+            <p>Connectez Laure à votre WhatsApp pour commencer l'aventure !</p>
+            
+            <div class="qr-container">
+                {% if qr_img_base64 %}
+                    <img src="data:image/png;base64,{{ qr_img_base64 }}" class="qr-image" alt="WhatsApp QR Code">
+                    <p><strong>Scannez ce code avec votre téléphone</strong></p>
+                {% else %}
+                    <div style="padding: 40px; color: #888;">
+                        <p>Génération du QR code en cours ou déjà connecté...</p>
+                        <p><small>Si vous êtes déjà connecté, vous pouvez fermer cette page.</small></p>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="instructions">
+                <strong>Comment faire ?</strong>
+                <ol>
+                    <li>Ouvrez WhatsApp sur votre téléphone.</li>
+                    <li>Allez dans <strong>Réglages</strong> > <strong>Appareils connectés</strong>.</li>
+                    <li>Appuyez sur <strong>Connecter un appareil</strong>.</li>
+                    <li>Scannez le code QR affiché ci-dessus.</li>
+                </ol>
+            </div>
+            
+            <a href="/" class="btn">Actualiser la page</a>
+            
+            <div class="footer">
+                Propulsé par Neonize & Gemini AI | Laure Bot v1.0
+            </div>
         </div>
     </body>
     </html>
-    """)
+    """, qr_img_base64=qr_img_base64)
 
 @main.route('/api/monetbil/webhook', methods=['POST'])
 def monetbil_webhook():
