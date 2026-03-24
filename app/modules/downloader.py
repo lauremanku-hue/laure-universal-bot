@@ -1,6 +1,5 @@
 import os
 import yt_dlp
-import 
 
 def download_media(query, is_audio=True):
     """

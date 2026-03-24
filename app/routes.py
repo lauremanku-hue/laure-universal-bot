@@ -1,7 +1,5 @@
 import os
 import json
-import io
-import base64
 from flask import Blueprint, jsonify, request, render_template_string, current_app
 from .models import User, MessageLog, QuizSession
 from .extensions import db
@@ -72,10 +70,6 @@ def index():
     </body>
     </html>
     """, pairing_code=pairing_code))
-    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
-    return resp
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'

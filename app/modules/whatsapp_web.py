@@ -1,8 +1,8 @@
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 import os
 import json
-import qrcode
 import time
 from neonize.client import NewClient
 from neonize.events import Message
@@ -65,10 +65,6 @@ class LaureWebBot:
                     # On marque comme rappelé pour ne pas spammer (on pourrait ajouter un champ 'reminded')
                 except:
                     pass
-
-    def on_qr(self, client, qr_string):
-        self.current_qr = qr_string
-        print(f"\n🌟 NOUVEAU QR CODE : {qr_string}\n")
 
     def get_pairing_code(self, phone_number):
         """Génère un code de couplage pour un numéro de téléphone."""

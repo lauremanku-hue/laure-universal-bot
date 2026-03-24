@@ -1,33 +1,27 @@
-# Laure Universel - Backend Bot
+# Laure Bot - Déploiement sur Railway
 
-Ce projet est le moteur du bot Laure, capable de gérer WhatsApp, Telegram, Messenger et Instagram.
+Ce bot WhatsApp est conçu pour fonctionner sur Railway avec Flask et Neonize.
 
-## Arborescence du Projet
+## Configuration
 
-```text
-├── app/                    # Code principal de l'application Flask
-│   ├── modules/            # Handlers spécifiques par plateforme et IA
-│   │   ├── ai_handler.py       # Moteur Gemini / IA
-│   │   ├── meta_handler.py     # Messenger & Instagram
-│   │   ├── telegram_handler.py # Telegram
-│   │   ├── whatsapp_handler.py # WhatsApp
-│   │   └── downloader.py       # Téléchargement YouTube/FB/IG
-│   ├── models.py           # Modèles de base de données (Users, Courses)
-│   ├── routes.py           # Webhooks et logique des commandes
-│   ├── tasks.py            # Tâches asynchrones (Celery)
-│   └── __init__.py         # Initialisation de l'app Flask
-├── celery_worker.py        # Point d'entrée pour le worker Celery
-├── laure_bot.py            # Script de lancement principal (Flask)
-├── requirements.txt        # Dépendances Python
-├── Procfile                # Configuration pour Railway/Render
-└── .env                    # Variables secrètes (NE PAS ENVOYER SUR GIT)
-```
+1.  **Variables d'environnement** :
+    *   `GEMINI_API_KEY` : Votre clé API Gemini pour les fonctionnalités IA.
+    *   `PORT` : 3000 (Railway le définit automatiquement).
 
-## Installation
+2.  **Stockage Persistant** :
+    *   WhatsApp nécessite de sauvegarder une session (`laure_session.db`).
+    *   Sur Railway, ajoutez un **Volume** et montez-le sur `/app/data`.
+    *   Modifiez le chemin de la session dans `app/modules/whatsapp_web.py` pour pointer vers `/app/data/laure_session.db`.
 
-1. Créer un environnement virtuel : `python -m venv venv`
-2. L'activer : `source venv/bin/activate` (Linux/Mac) ou `venv\Scripts\activate` (Windows)
-3. Installer les dépendances : `pip install -r requirements.txt`
-4. Configurer le fichier `.env`
-5. Lancer le bot (développement) : `python laure_bot.py`
-6. Lancer le bot (production) : `gunicorn laure_bot:app`
+## Déploiement
+
+Le projet contient un `Dockerfile` et un `Procfile` pour faciliter le déploiement sur Railway.
+
+1.  Connectez votre dépôt GitHub à Railway.
+2.  Railway détectera automatiquement le `Dockerfile` ou le `Procfile`.
+3.  Vérifiez les logs pour voir le QR code à scanner lors de la première connexion.
+
+## Résolution des problèmes
+
+*   **Timeout / EOF** : Cela arrive souvent si la connexion est instable ou si l'IP est bloquée. Essayez de redémarrer le service ou de supprimer le fichier de session pour recommencer.
+*   **SyntaxError** : Corrigé (suppression des caractères invisibles).
