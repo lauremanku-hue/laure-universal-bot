@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-# Installer les dépendances système nécessaires pour neonize et sqlite
+# Installer les dépendances système nécessaires pour neonize, sqlite, libmagic et ffmpeg
 RUN apt-get update && apt-get install -y \
     sqlite3 \
     libsqlite3-dev \
@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     g++ \
     make \
+    libmagic1 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
