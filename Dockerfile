@@ -12,3 +12,15 @@ WORKDIR /app
 
 # Copier les fichiers de dépendances
 COPY requirements.txt .
+
+# Installer les dépendances Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copier le reste du code
+COPY . .
+
+# Exposer le port par défaut (Railway gère le mapping)
+EXPOSE 3000
+
+# Commande de démarrage avec port dynamique (via shell pour expansion de $PORT)
+CMD python3 -m gunicorn main:app --bind 0.0.0.0:$PORT --timeout 600 --workers 1 --threads 8
