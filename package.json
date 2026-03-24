@@ -1,20 +1,13 @@
 {
-  "name": "laure.support---multi-channel-architect",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "name": "laure-bot-whatsapp",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot with AI capabilities",
+  "main": "main.py",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "python main.py",
+    "start": "gunicorn main:app --bind 0.0.0.0:$PORT --timeout 600 --workers 1 --threads 8",
+    "build": "echo 'No build step needed for Python'"
   },
-  "dependencies": {
-
-  },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-    
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
-  }
+  "dependencies": {},
+  "devDependencies": {}
 }
