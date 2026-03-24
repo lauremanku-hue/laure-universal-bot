@@ -19,14 +19,13 @@ def index():
     <!DOCTYPE html>
     <html>
     <head>
-        <title>LAURE BOT - CONNEXION PAR NUMÉRO (SANS QR CODE)</title>
+        <title>LAURE BOT - CONNEXION v1.2.4</title>
         <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; color: #1c1e21; }
             .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: inline-block; max-width: 450px; width: 100%; margin-top: 50px; }
             h1 { color: #25d366; margin-bottom: 20px; font-size: 2.2em; }
             .status-badge { padding: 8px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9em; display: inline-block; margin-bottom: 25px; }
             .status-waiting { background: #fff3cd; color: #856404; }
-            .status-connected { background: #d4edda; color: #155724; }
             .status-pairing { background: #cce5ff; color: #004085; }
             
             .pairing-box { background: #f8f9fa; padding: 30px; border-radius: 15px; margin: 25px 0; border: 2px dashed #007bff; }
@@ -34,10 +33,8 @@ def index():
             
             .input-group { margin: 30px 0; }
             input { padding: 15px; border-radius: 10px; border: 2px solid #ddd; width: 80%; font-size: 1.1em; outline: none; transition: border-color 0.3s; }
-            input:focus { border-color: #25d366; }
             
-            .btn { background: #25d366; color: white; padding: 15px 30px; border-radius: 10px; text-decoration: none; display: inline-block; font-weight: bold; border: none; cursor: pointer; font-size: 1.1em; width: 80%; margin-top: 10px; transition: transform 0.2s; }
-            .btn:active { transform: scale(0.98); }
+            .btn { background: #25d366; color: white; padding: 15px 30px; border-radius: 10px; text-decoration: none; display: inline-block; font-weight: bold; border: none; cursor: pointer; font-size: 1.1em; width: 80%; margin-top: 10px; }
             .btn-blue { background: #007bff; }
             
             .instructions { text-align: left; background: #fff; padding: 20px; border-radius: 12px; font-size: 0.95em; margin-top: 30px; border: 1px solid #eee; }
@@ -53,11 +50,10 @@ def index():
                 <div class="pairing-box">
                     <p>Entrez ce code sur votre WhatsApp :</p>
                     <div class="pairing-code">{{ pairing_code }}</div>
-                    <p><small>Le code expire dans quelques minutes.</small></p>
                 </div>
             {% else %}
                 <div class="status-badge status-waiting">⏳ En attente de connexion</div>
-                <p>Connectez Laure à votre numéro WhatsApp pour commencer.</p>
+                <p>Entrez votre numéro pour connecter Laure.</p>
                 
                 <form action="/pair" method="POST" class="input-group">
                     <input type="text" name="phone" placeholder="Ex: 237690000000" required>
@@ -66,20 +62,11 @@ def index():
             {% endif %}
 
             <div class="instructions">
-                <strong>💡 Comment se connecter ?</strong>
-                <ol style="padding-left: 20px; margin-top: 10px;">
-                    <li>Ouvrez WhatsApp sur votre téléphone.</li>
-                    <li>Allez dans <strong>Appareils connectés</strong>.</li>
-                    <li>Appuyez sur <strong>Connecter un appareil</strong>.</li>
-                    <li>Appuyez sur <strong>"Connecter avec le numéro de téléphone"</strong> (en bas).</li>
-                    <li>Saisissez le code affiché ci-dessus.</li>
-                </ol>
+                <strong>💡 Note :</strong> Le bot démarre à la demande pour économiser les ressources.
             </div>
             
-            <a href="/" style="display:block; margin-top:20px; color:#666; text-decoration:none; font-size:0.9em;">🔄 Actualiser la page</a>
-            
             <div class="footer">
-                Laure Bot v1.2.2 | Propulsé par Neonize
+                Laure Bot v1.2.4 | Port 3000 Forcé
             </div>
         </div>
     </body>
@@ -89,14 +76,46 @@ def index():
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
     return resp
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 @main.route('/pair', methods=['POST'])
 def pair_with_phone():
-    from flask import current_app, redirect, url_for, request, flash
+    from flask import current_app, redirect, url_for, request
     phone = request.form.get('phone')
-    bot = getattr(current_app, 'bot', None)
+    if not phone:
+        return redirect(url_for('main.index'))
     
-    if bot and phone:
+    # Nettoyage du numéro
+    phone = phone.replace('+', '').replace(' ', '')
+    
+    # Démarrage du bot UNIQUEMENT quand on demande un code
+    bot = getattr(current_app, 'bot', None)
+    if not bot:
+        from app.modules.whatsapp_web import LaureWebBot
+        import threading
+        
+        def start_bot_async(app_instance):
+            with app_instance.app_context():
+                try:
+                    new_bot = LaureWebBot()
+                    app_instance.bot = new_bot
+                    new_bot.start(app=app_instance)
+                except Exception as e:
+                    print(f"❌ Erreur lors du démarrage du bot : {e}")
+        
+        # On passe l'instance réelle de l'application au thread
+        thread = threading.Thread(target=start_bot_async, args=(current_app._get_current_object(),), daemon=True)
+        thread.start()
+        
+        # On attend un tout petit peu que le bot s'initialise
+        import time
+        time.sleep(2)
+        bot = getattr(current_app, 'bot', None)
+
+    if bot:
         res = bot.get_pairing_code(phone)
         if res['status'] == 'success':
             return redirect(url_for('main.index'))
