@@ -6,6 +6,10 @@ RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     ca-certificates \
     curl \
+    gcc \
+    python3-dev \
+    g++ \
+    make \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -14,7 +18,8 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Installer les dépendances Python
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copier le reste du code
 COPY . .
