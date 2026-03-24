@@ -1,11 +1,11 @@
 {
-  "name": "laure-bot-whatsapp",
+  "name": "laure-bot-Universel",
   "version": "1.0.0",
   "description": "WhatsApp Bot with AI capabilities",
   "main": "main.py",
   "scripts": {
     "dev": "python main.py",
-    "start": "gunicorn main:app --bind 0.0.0.0:$PORT --timeout 600 --workers 1 --threads 8",
+    "start": "python3 -m gunicorn main:app --bind 0.0.0.0:$PORT --timeout 600 --workers 1 --threads 8",
     "build": "echo 'No build step needed for Python'"
   },
   "dependencies": {},
