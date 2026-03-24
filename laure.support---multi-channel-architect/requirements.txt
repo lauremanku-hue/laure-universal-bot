@@ -1,0 +1,10 @@
+flask
+flask-sqlalchemy
+neonize
+requests
+gunicorn
+python-dotenv
+google-generativeai
+yt-dlp
+apscheduler
+Pillow
