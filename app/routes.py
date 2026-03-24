@@ -1,327 +1,301 @@
-
 import os
-from flask import Blueprint, request, jsonify, make_response
-from datetime import datetime, timedelta
-
+import json
+import io
+import base64
+from flask import Blueprint, jsonify, request, render_template_string, current_app
+from .models import User, MessageLog, QuizSession
 from .extensions import db
-from .models import User, Interaction, Subscription, Course
-from .modules.ai_handler import AIHandler
-from .modules.telegram_handler import TelegramHandler
-from .modules.whatsapp_handler import WhatsAppHandler
-from .modules.downloader import validate_url
-from .tasks import process_download_task
+from datetime import datetime, timedelta
 
 main = Blueprint('main', __name__)
 
-def send_data_bonus(phone, network):
-    """
-    Simule l'envoi du bonus de 500 Mo.
-    En production, ceci appellerait une API de recharge.
-    """
-    print(f"📡 Envoi de 500 Mo au {phone} sur le réseau {network}")
-    return True
-
-# Initialisation sécurisée des handlers
-try:
-    ai = AIHandler()
-    tg = TelegramHandler()
-    wa_handler = WhatsAppHandler()
-    print("✅ Handlers (AI, Telegram, WhatsApp) opérationnels.")
-except Exception as e:
-    print(f"⚠️ Erreur initialisation Handlers : {e}")
-    ai = None
-    tg = None
-    wa_handler = None
-
-def process_command(user, msg, platform):
-    """Cerveau du bot : traite les messages et décide de la réponse."""
-    # Logique d'interaction
-    new_int = Interaction(user_id=user.id, last_message=msg)
-    db.session.add(new_int)
-    db.session.commit()
-
-    # Infos de contact
-    contact_info = "\n\n📧 Contact : laure.support@example.com\n📱 WhatsApp : +237 6659867487/686683246"
-
-    # 1. MENU & AIDE
-    if msg.lower() in ['aide', 'menu', '/start', '/menu']:
-        menu_text = (
-            "🚀 *LAURE - TON ASSISTANTE IA TOUT-EN-UN* 🚀\n\n"
-            "Salut ! Je suis Laure. Je suis là pour t'aider à apprendre, créer et t'amuser ! ✨\n\n"
-            "💡 *CE QUE JE PEUX FAIRE POUR TOI :*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🧠 *Répondre à tout* : Pose-moi n'importe quelle question !\n"
-            "🎨 *Créer des images* : Tape `/img ton idée` (ex: /img un lion en costume)\n"
-            "📥 *Télécharger* : Envoie-moi un lien YouTube/FB/TikTok/IG\n"
-            "🎁 *Gagner* : Tape `/cadeau` pour voir tes bonus\n"
-            "💎 *Devenir VIP* : Tape `/pay` pour l'illimité + 500 Mo offerts !\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📢 *PARTAGE LAURE* : Transfère ce message à tes amis pour les aider aussi !"
-            f"{contact_info}"
-        )
-        return {"message": menu_text}
-
-    # 1.1 COMMANDE CADEAU / PARRAINAGE
-    elif msg.lower() == '/cadeau':
-        referral_link = f"https://wa.me/923436404197048?text=Menu" # On utilise le numéro Meta
-        gift_text = (
-            "🎁 *TES CADEAUX LAURE* 🎁\n\n"
-            "✅ *Bonus de bienvenue* : 100 FCFA déjà crédités !\n"
-            "🔥 *OFFRE SPÉCIALE* : Partage ton lien avec 5 amis et gagne *1 jour de Premium GRATUIT* !\n\n"
-            f"🔗 *Ton lien de partage* : {referral_link}\n\n"
-            "_Plus tu partages, plus Laure devient intelligente pour toi !_"
-        )
-        return {"message": gift_text}
-
-    # 1.5 COMMANDE ADMIN (Réservée)
-    elif msg.lower() == '/admin':
-        admin_id = os.getenv("ADMIN_ID")
-        if user.platform_id == admin_id:
-            total_users = User.query.count()
-            premium_users = User.query.filter(User.is_premium_member == True).count()
-            total_interactions = Interaction.query.count()
-            
-            stats = (
-                "📊 *TABLEAU DE BORD ADMIN*\n\n"
-                f"👥 Utilisateurs totaux : {total_users}\n"
-                f"💎 Membres Premium : {premium_users}\n"
-                f"💬 Interactions totales : {total_interactions}\n\n"
-                "✅ Laure fonctionne parfaitement !"
-            )
-            return {"message": stats}
-        else:
-            return {"message": "🚫 Commande réservée à l'administrateur."}
-
-    # 2. PAIEMENT
-    elif msg.lower() == '/pay':
-        plans_text = (
-            "💎 *CHOISIS TON PLAN VIP LAURE* 💎\n\n"
-            "Débloque tout le potentiel de Laure :\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "1️⃣ *1 SEMAINE* : 500 FCFA\n"
-            "👉 Tape `/pay 1` pour ce plan\n\n"
-            "2️⃣ *2,5 SEMAINES* : 750 FCFA\n"
-            "👉 Tape `/pay 2` pour ce plan\n\n"
-            "3️⃣ *1 MOIS* : 1500 FCFA\n"
-            "👉 Tape `/pay 3` pour ce plan\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎁 *BONUS* : 500 Mo de DATA offerts pour chaque abonnement !"
-        )
-        return {"message": plans_text}
-
-    elif msg.lower().startswith('/pay '):
-        choice = msg.split(' ')[1]
-        service_id = os.getenv("MONETBIL_SERVICE_ID", "votre_id_ici")
-        
-        plans = {
-            "1": {"amount": 500, "label": "1 Semaine"},
-            "2": {"amount": 750, "label": "2,5 Semaines"},
-            "3": {"amount": 1500, "label": "1 Mois"}
-        }
-        
-        if choice in plans:
-            plan = plans[choice]
-            payment_url = f"https://www.monetbil.com/pay/v2.1/{service_id}?amount={plan['amount']}&phone={user.platform_id}&externalId={user.id}&item_name=Premium_{plan['label']}"
-            return {"message": (
-                f"💳 *PAIEMENT PLAN {plan['label'].upper()}*\n\n"
-                f"💰 Montant : {plan['amount']} FCFA\n"
-                f"🔗 *Lien sécurisé* : {payment_url}\n\n"
-                "_Ton compte sera activé automatiquement après le paiement._"
-            )}
-        else:
-            return {"message": "❌ Plan invalide. Tape `/pay` pour voir les options."}
-
-    # 3. IA IMAGE (Premium Check)
-    elif msg.startswith('/img '):
-        if not user.is_premium:
-            return {"message": "❌ *ACCÈS PREMIUM REQUIS*\n\nCette fonctionnalité est réservée aux abonnés. Tapez */pay* pour activer votre accès !"}
-        if ai:
-            prompt = msg.replace('/img ', '')
-            res = ai.generate_image_from_text(prompt)
-            return {"message": f"🎨 Image générée pour : {prompt}\nLien : {res.get('url')}"}
-        return {"message": "Moteur d'image indisponible."}
-
-    # 4. TÉLÉCHARGEMENT VIDÉO (Premium Check)
-    elif validate_url(msg):
-        if not user.is_premium:
-            return {"message": "❌ *ACCÈS PREMIUM REQUIS*\n\nLe téléchargement de vidéos est réservé aux abonnés. Tapez */pay* pour profiter de Laure en illimité !"}
-        process_download_task.delay(msg, user.platform_id)
-        return {"message": "📥 Lien reçu ! Analyse en cours..."}
-
-    # 5. IA UNIVERSELLE (Répond à tout le reste)
-    else:
-        if ai:
-            # On demande à l'IA de répondre de manière pédagogique et amicale
-            response = ai.generate_text(f"Réponds en tant que Laure, une assistante IA intelligente et amicale. Question de l'utilisateur : {msg}")
-            return {"message": response}
-        return {"message": f"🤖 Laure a bien reçu : \"{msg}\". Tapez /menu pour voir mes options !"}
-
-@main.route('/webhook/meta', methods=['GET', 'POST'])
-def whatsapp_webhook():
-    if request.method == 'GET':
-        mode = request.args.get("hub.mode")
-        token_recu = request.args.get("hub.verify_token")
-        challenge = request.args.get("hub.challenge")
-        token_attendu = os.getenv("VERIFY_TOKEN", "laure_secret")
-        if mode == "subscribe" and token_recu == token_attendu:
-            return make_response(str(challenge), 200)
-        return "Forbidden", 403
-
-    data = request.json
-    try:
-        if data and 'entry' in data:
-            for entry in data['entry']:
-                # Gestion Messenger / Instagram
-                if 'messaging' in entry:
-                    for messaging_event in entry['messaging']:
-                        sender_id = messaging_event['sender']['id']
-                        if 'message' in messaging_event and 'text' in messaging_event['message']:
-                            text = messaging_event['message']['text']
-                            platform = 'instagram' if 'instagram' in str(entry).lower() else 'messenger'
-                            user = User.query.filter_by(platform=platform, platform_id=sender_id).first()
-                            if not user:
-                                user = User(platform=platform, platform_id=sender_id, name=f"User {platform.capitalize()}", bonus_given=True)
-                                db.session.add(user)
-                                db.session.commit()
-                            resp = process_command(user, text, platform)
-                            # Envoi réponse (à implémenter selon MetaHandler)
-                
-                # Gestion WhatsApp
-                elif 'changes' in entry:
-                    value = entry['changes'][0]['value']
-                    if 'messages' in value:
-                        msg = value['messages'][0]
-                        sender = msg['from']
-                        text = msg.get('text', {}).get('body', '')
-
-                        user = User.query.filter_by(platform='whatsapp', platform_id=sender).first()
-                        if not user:
-                            user = User(platform='whatsapp', platform_id=sender, name="Utilisateur WA", bonus_given=True)
-                            db.session.add(user)
-                            db.session.commit()
-                            welcome_msg = "🌟 *BIENVENUE CHEZ LAURE !* 🌟\n\nMerci de m'avoir contactée ! Tu as reçu un *bonus de 100 FCFA* pour tester mes services.\n\nTape *menu* pour voir tout ce que je peux faire pour toi !"
-                            if wa_handler: wa_handler.send_text(sender, welcome_msg)
-
-                        resp = process_command(user, text, 'whatsapp')
-                        if wa_handler: wa_handler.send_text(sender, resp['message'])
-    except Exception as e:
-        print(f"❌ Erreur Webhook Meta: {e}")
-
-    return jsonify({"status": "ok"}), 200
-
-@main.route('/webhook/monetbil', methods=['POST'])
-def monetbil_webhook():
-    data = request.form
-    status = data.get('status')
-    amount = data.get('amount')
-    user_id = data.get('externalId')
-    phone = data.get('phone')
-    operator = data.get('operator') # MTN ou ORANGE
-
-    if status == 'success':
-        user = User.query.get(user_id)
-        if user:
-            user.is_premium_member = True
-            
-            # Gestion du bonus de 500 Mo
-            bonus_msg = ""
-            if not user.data_bonus_given and operator in ['MTN', 'ORANGE']:
-                if send_data_bonus(phone, operator):
-                    user.data_bonus_given = True
-                    bonus_msg = "\n\n🎁 *CADEAU* : Tes 500 Mo de bonus ont été envoyés sur ton numéro !"
-
-            db.session.commit()
-
-            # Notification au bot
-            msg = f"✅ *PAIEMENT REÇU !*\n\nMerci ! Ton compte est maintenant *PREMIUM*. Profite bien de Laure !{bonus_msg}"
-            if user.platform == 'whatsapp' and wa_handler:
-                wa_handler.send_text(user.platform_id, msg)
-            elif user.platform == 'telegram' and tg:
-                tg.send_message(user.platform_id, msg)
-
-    return "OK", 200
-
-@main.route('/payment/success')
-def payment_success():
-    return "<h1>Paiement réussi !</h1><p>Vous pouvez retourner sur WhatsApp/Telegram.</p>"
-
-@main.route('/payment/fail')
-def payment_fail():
-    return "<h1>Paiement échoué</h1><p>Veuillez réessayer ou contacter le support.</p>"
-
-@main.route('/privacy')
-@main.route('/privacy/')
-def privacy():
-    return """
+@main.route('/')
+def index():
+    bot = getattr(current_app, 'bot', None)
+    pairing_code = getattr(bot, 'pairing_code', None) if bot else None
+    
+    from flask import make_response
+    resp = make_response(render_template_string("""
     <!DOCTYPE html>
-    <html lang="fr">
+    <html>
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Politique de Confidentialité - Laure Bot</title>
+        <title>LAURE BOT - CONNEXION v1.2.4</title>
         <style>
-            body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
-            h1 { color: #2c3e50; }
-            .date { color: #7f8c8d; font-style: italic; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; color: #1c1e21; }
+            .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: inline-block; max-width: 450px; width: 100%; margin-top: 50px; }
+            h1 { color: #25d366; margin-bottom: 20px; font-size: 2.2em; }
+            .status-badge { padding: 8px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9em; display: inline-block; margin-bottom: 25px; }
+            .status-waiting { background: #fff3cd; color: #856404; }
+            .status-pairing { background: #cce5ff; color: #004085; }
+            
+            .pairing-box { background: #f8f9fa; padding: 30px; border-radius: 15px; margin: 25px 0; border: 2px dashed #007bff; }
+            .pairing-code { font-size: 3em; font-weight: 900; letter-spacing: 8px; color: #007bff; margin: 15px 0; font-family: monospace; }
+            
+            .input-group { margin: 30px 0; }
+            input { padding: 15px; border-radius: 10px; border: 2px solid #ddd; width: 80%; font-size: 1.1em; outline: none; transition: border-color 0.3s; }
+            
+            .btn { background: #25d366; color: white; padding: 15px 30px; border-radius: 10px; text-decoration: none; display: inline-block; font-weight: bold; border: none; cursor: pointer; font-size: 1.1em; width: 80%; margin-top: 10px; }
+            .btn-blue { background: #007bff; }
+            
+            .instructions { text-align: left; background: #fff; padding: 20px; border-radius: 12px; font-size: 0.95em; margin-top: 30px; border: 1px solid #eee; }
+            .footer { margin-top: 40px; color: #888; font-size: 0.85em; }
         </style>
     </head>
     <body>
-        <h1>Politique de Confidentialité - Laure Bot</h1>
-        <p class="date">Dernière mise à jour : 09 Mars 2026</p>
-        <p>Laure Bot est un service d'assistance par intelligence artificielle. Nous accordons une grande importance à la protection de vos données personnelles.</p>
-        
-        <h2>1. Collecte des données</h2>
-        <p>Nous collectons uniquement les informations strictement nécessaires au fonctionnement du service :</p>
-        <ul>
-            <li>Votre identifiant de plateforme (WhatsApp ID ou Telegram ID).</li>
-            <li>Le contenu des messages que vous envoyez au bot pour permettre à l'IA de vous répondre.</li>
-            <li>Votre numéro de téléphone lors des transactions de paiement pour la validation de l'abonnement Premium.</li>
-        </ul>
+        <div class="card">
+            <h1>🌟 Laure Bot</h1>
+            
+            {% if pairing_code %}
+                <div class="status-badge status-pairing">📲 Code de couplage prêt</div>
+                <div class="pairing-box">
+                    <p>Entrez ce code sur votre WhatsApp :</p>
+                    <div class="pairing-code">{{ pairing_code }}</div>
+                </div>
+            {% else %}
+                <div class="status-badge status-waiting">⏳ En attente de connexion</div>
+                <p>Entrez votre numéro pour connecter Laure.</p>
+                
+                <form action="/pair" method="POST" class="input-group">
+                    <input type="text" name="phone" placeholder="Ex: 237690000000" required>
+                    <button type="submit" class="btn btn-blue">Générer mon code</button>
+                </form>
+            {% endif %}
 
-        <h2>2. Utilisation des données</h2>
-        <p>Vos données sont utilisées exclusivement pour :</p>
-        <ul>
-            <li>Générer des réponses personnalisées via l'IA.</li>
-            <li>Traiter vos paiements de manière sécurisée via notre partenaire <strong>Monetbil</strong>.</li>
-            <li>Gérer votre abonnement Premium et vos accès aux fonctionnalités avancées.</li>
-        </ul>
-
-        <h2>3. Partage des données</h2>
-        <p>Nous ne vendons, ne louons et ne partageons jamais vos données personnelles avec des tiers à des fins commerciales.</p>
-
-        <h2>4. Contact</h2>
-        <p>Pour toute question, vous pouvez nous contacter à l'adresse e-mail de support indiquée dans le menu du bot.</p>
+            <div class="instructions">
+                <strong>💡 Note :</strong> Le bot démarre à la demande pour économiser les ressources.
+            </div>
+            
+            <div class="footer">
+                Laure Bot v1.2.4 | Port 3000 Forcé
+            </div>
+        </div>
     </body>
     </html>
-    """
+    """, pairing_code=pairing_code))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
-@main.route('/download-app')
-def download_app():
-    # Cette route permettra aux utilisateurs de télécharger l'APK directement
-    # Tu devras placer ton fichier laure_bot.apk dans le dossier /static/
-    return """
-    <h1>Télécharger Laure Bot</h1>
-    <p>Cliquez sur le bouton ci-dessous pour télécharger l'application Android (APK).</p>
-    <a href="/static/laure_bot.apk" style="padding: 10px 20px; background: #25D366; color: white; text-decoration: none; border-radius: 5px;">Télécharger l'APK</a>
-    """
-
-@main.route('/webhook/telegram', methods=['POST'])
-def telegram_webhook():
-    data = request.json
-    if data and "message" in data:
-        chat_id = str(data["message"]["chat"]["id"])
-        text = data["message"].get("text", "")
+@main.route('/pair', methods=['POST'])
+def pair_with_phone():
+    from flask import current_app, redirect, url_for, request
+    phone = request.form.get('phone')
+    if not phone:
+        return redirect(url_for('main.index'))
+    
+    # Nettoyage du numéro
+    phone = phone.replace('+', '').replace(' ', '')
+    
+    # Démarrage du bot UNIQUEMENT quand on demande un code
+    bot = getattr(current_app, 'bot', None)
+    if not bot:
+        from app.modules.whatsapp_web import LaureWebBot
+        import threading
         
-        user = User.query.filter_by(platform='telegram', platform_id=chat_id).first()
-        if not user:
-            user = User(platform='telegram', platform_id=chat_id, name="User TG", bonus_given=True)
-            db.session.add(user)
-            db.session.commit()
-            welcome_msg = "🌟 *BIENVENUE CHEZ LAURE SUR TELEGRAM !* 🌟\n\nTu as reçu un *bonus de 100 FCFA*.\n\nTape *menu* pour commencer !"
-            if tg: tg.send_message(chat_id, welcome_msg)
+        def start_bot_async(app_instance):
+            with app_instance.app_context():
+                try:
+                    new_bot = LaureWebBot()
+                    app_instance.bot = new_bot
+                    new_bot.start(app=app_instance)
+                except Exception as e:
+                    print(f"❌ Erreur lors du démarrage du bot : {e}")
+        
+        # On passe l'instance réelle de l'application au thread
+        thread = threading.Thread(target=start_bot_async, args=(current_app._get_current_object(),), daemon=True)
+        thread.start()
+        
+        # On attend un tout petit peu que le bot s'initialise
+        import time
+        time.sleep(2)
+        bot = getattr(current_app, 'bot', None)
 
-        resp = process_command(user, text, 'telegram')
-        if tg: tg.send_message(chat_id, resp['message'])
+    if bot:
+        res = bot.get_pairing_code(phone)
+        if res['status'] == 'success':
+            return redirect(url_for('main.index'))
+        else:
+            return f"Erreur : {res['message']}. <a href='/'>Retour</a>"
+    
+    return redirect(url_for('main.index'))
+
+@main.route('/api/monetbil/webhook', methods=['POST'])
+def monetbil_webhook():
+    """
+    Handle Monetbil payment notifications.
+    """
+    data = request.form
+    status = data.get('status')
+    custom = data.get('custom') # Format: user_id:plan_type
+    
+    if status == 'success' and custom:
+        try:
+            user_id, plan_type = custom.split(':')
+            user = User.query.get(int(user_id))
+            if user:
+                user.is_premium = True
+                now = datetime.utcnow()
+                if plan_type == 'day':
+                    user.premium_ends_at = (user.premium_ends_at or now) + timedelta(days=1)
+                elif plan_type == 'week':
+                    user.premium_ends_at = (user.premium_ends_at or now) + timedelta(days=7)
+                elif plan_type == 'month':
+                    user.premium_ends_at = (user.premium_ends_at or now) + timedelta(days=30)
+                
+                db.session.commit()
+                return jsonify({"status": "ok"}), 200
+        except Exception as e:
+            print(f"❌ Error processing Monetbil webhook: {e}")
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+    return jsonify({"status": "ignored"}), 200
+
+def process_command(user, msg, platform):
+    """
+    Process a command from a user and return a response.
+    """
+    clean_msg = msg.lower().strip()
+    
+    if clean_msg == 'menu':
+        status = "✅ ESSAI ACTIF" if user.has_access() and not user.is_premium else "💎 VIP ACTIF" if user.is_premium else "❌ ACCÈS EXPIRÉ"
+        return {
+            "message": (
+                f"🌟 *MENU DE LAURE* 🌟\n"
+                f"Statut : {status}\n\n"
+                "Voici ce que je peux faire pour toi :\n"
+                "1. 🎨 *Image IA* : `/img <description>`\n"
+                "2. 🎵 *Musique* : `/audio <recherche>`\n"
+                "3. 🎓 *Aide aux Devoirs* : Envoie une photo ou tape `prof`.\n"
+                "4. 📚 *Quiz Avancé* : `quiz <sujet>` (ex: `quiz histoire`)\n"
+                "5. 🤔 *Devinette* : Tape `devinette`.\n"
+                "6. 📅 *Programmer un Cours* : `/programme_cours Titre | HH:MM | Jour(0-6)`\n"
+                "7. 📢 *Partager* : `/partager`.\n"
+                "8. 💎 *VIP* : `vip` pour t'abonner."
+            )
+        }
+
+    if clean_msg == '/partager':
+        return {
+            "message": (
+                "📢 *AIDE-MOI À GRANDIR !* 📢\n\n"
+                "Tu aimes mes services ? Partage-moi avec tes amis et reçois *50 FCFA* par ami qui s'inscrit !\n\n"
+                "Copie et transfère ce message :\n"
+                "---------------------------\n"
+                "Salut ! J'utilise *Laure*, une IA incroyable sur WhatsApp qui aide pour les devoirs, génère des images et télécharge de la musique. Teste-la ici : https://wa.me/TON_NUMERO_BOT"
+            )
+        }
+    
+    if clean_msg == '/solde':
+        now = datetime.utcnow()
+        if user.is_premium:
+            expiry = user.premium_ends_at.strftime("%d/%m/%Y %H:%M") if user.premium_ends_at else "Illimité"
+            msg = f"💎 *STATUT VIP* : ✅ ACTIF\n📅 Expire le : {expiry}"
+        else:
+            expiry = user.trial_ends_at.strftime("%d/%m/%Y %H:%M") if user.trial_ends_at else "Expiré"
+            msg = f"⏳ *STATUT ESSAI* : {'✅ ACTIF' if user.has_access() else '❌ EXPIRÉ'}\n📅 Fin de l'essai : {expiry}"
+        
+        return {"message": msg}
+    
+    if clean_msg == 'vip':
+        return {
+            "message": (
+                "💎 *OFFRES VIP LAURE* 💎\n\n"
+                "Deviens VIP pour profiter de Laure en illimité :\n"
+                "- 🎨 Images IA illimitées\n"
+                "- 🎵 Téléchargements Audio/Vidéo illimités\n"
+                "- 🎓 Aide aux devoirs complète\n"
+                "- 🚀 Réponses prioritaires\n\n"
+                "Options :\n"
+                "1. *Journée* : 200 FCFA\n"
+                "2. *Semaine* : 1000 FCFA\n"
+                "3. *Mois* : 3000 FCFA\n\n"
+                "Tape *payer* pour obtenir ton lien de paiement sécurisé."
+            )
+        }
+    
+    if clean_msg == 'devinette':
+        from app.modules.ai_handler import AIHandler
+        ai = AIHandler()
+        riddle = ai.get_riddle()
+        # On stocke la réponse attendue dans une session temporaire ou on utilise un format spécifique
+        return {
+            "message": f"🤔 *DEVINETTE* :\n\n{riddle['question']}\n\n(Réponds pour voir si tu as juste !)"
+        }
+
+    if clean_msg.startswith('quiz '):
+        topic = msg.split(' ', 1)[1]
+        from app.modules.ai_handler import AIHandler
+        ai = AIHandler()
+        questions = ai.generate_quiz_questions(topic, count=20)
+        if not questions:
+            return {"message": "Désolé, je n'ai pas pu générer de quiz sur ce sujet."}
+        
+        session = QuizSession(
+            group_id=user.platform_id, 
+            status='active', 
+            questions_data=json.dumps(questions),
+            responses='[]',
+            current_question_index=0,
+            total_questions=len(questions),
+            correct_answers_count=0
+        )
+        db.session.add(session)
+        db.session.commit()
+        
+        q = questions[0]
+        return {
+            "message": (
+                f"📚 *QUIZ : {topic.upper()}* (1/{len(questions)})\n\n"
+                f"{q['q']}\n\n"
+                f"A) {q['a']}\n"
+                f"B) {q['b']}\n"
+                f"C) {q['c']}\n"
+                f"D) {q['d']}\n\n"
+                "Réponds par A, B, C ou D."
+            )
+        }
+
+    if clean_msg.startswith('/programme_cours '):
+        # Format: /programme_cours Titre | HH:MM | Jour(0-6)
+        try:
+            parts = msg.split(' ', 1)[1].split('|')
+            title = parts[0].strip()
+            time_str = parts[1].strip()
+            day = int(parts[2].strip())
             
-    return jsonify({"status": "ok"}), 200
+            from .models import ScheduledCourse
+            new_course = ScheduledCourse(
+                user_id=user.id,
+                title=title,
+                target_jid=user.platform_id, # Par défaut au JID de l'utilisateur
+                day_of_week=day,
+                scheduled_time=time_str
+            )
+            db.session.add(new_course)
+            db.session.commit()
+            return {"message": f"✅ Cours sur *{title}* programmé pour chaque {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'][day]} à {time_str} !"}
+        except:
+            return {"message": "❌ Format invalide. Utilise : `/programme_cours Titre | HH:MM | Jour(0-6)`"}
 
+    if clean_msg == 'payer':
+        # Placeholder for Monetbil Service ID
+        service_id = os.environ.get('MONETBIL_SERVICE_ID', 'YOUR_SERVICE_ID')
+        # We can generate different links for different plans
+        return {
+            "message": (
+                "💳 *PAIEMENT SÉCURISÉ MONETBIL* 💳\n\n"
+                "Choisis ton forfait pour continuer à utiliser Laure :\n\n"
+                f"1️⃣ *1 JOUR* (200 FCFA) :\n🔗 https://www.monetbil.com/pay/v2.1/{service_id}?amount=200&custom={user.id}:day\n\n"
+                f"2️⃣ *1 SEMAINE* (1000 FCFA) :\n🔗 https://www.monetbil.com/pay/v2.1/{service_id}?amount=1000&custom={user.id}:week\n\n"
+                f"3️⃣ *1 MOIS* (3000 FCFA) :\n🔗 https://www.monetbil.com/pay/v2.1/{service_id}?amount=3000&custom={user.id}:month\n\n"
+                "✅ Ton compte sera activé *automatiquement* dès que le paiement est confirmé !"
+            )
+        }
+    
+    # Placeholder for other commands
+    return {"message": "Je n'ai pas compris cette commande. Tape *menu* pour voir les options."}

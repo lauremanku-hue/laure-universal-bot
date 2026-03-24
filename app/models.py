@@ -1,62 +1,62 @@
-
 from .extensions import db
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class User(db.Model):
-    __tablename__ = 'laure_user'
-    
     id = db.Column(db.Integer, primary_key=True)
-    platform = db.Column(db.String(20), default='whatsapp')
-    platform_id = db.Column(db.String(100), nullable=False)
+    platform = db.Column(db.String(50))
+    platform_id = db.Column(db.String(100), unique=True)
     name = db.Column(db.String(100))
+    bonus_given = db.Column(db.Boolean, default=False)
+    balance = db.Column(db.Float, default=0.0)
+    is_premium = db.Column(db.Boolean, default=False)
+    premium_ends_at = db.Column(db.DateTime, nullable=True)
+    trial_ends_at = db.Column(db.DateTime, default=lambda: datetime.utcnow() + timedelta(days=3))
+    mode = db.Column(db.String(20), default='normal') # 'normal', 'professeur'
+    last_active = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Paramètres de quota et bonus
-    is_premium_member = db.Column(db.Boolean, default=False)
-    bonus_given = db.Column(db.Boolean, default=False) # Bonus 100 FCFA
-    data_bonus_given = db.Column(db.Boolean, default=False) # Bonus 500 Mo
-    
-    # Relations
-    subscriptions = db.relationship('Subscription', backref='owner', lazy=True, cascade="all, delete-orphan")
-    interactions = db.relationship('Interaction', backref='user', lazy=True, cascade="all, delete-orphan")
 
-    __table_args__ = (db.UniqueConstraint('platform', 'platform_id', name='_user_platform_uc'),)
-
-    @property
-    def is_premium(self):
+    def has_access(self):
+        """Check if the user still has access (trial or premium)."""
         now = datetime.utcnow()
-        active = Subscription.query.filter(
-            Subscription.user_id == self.id,
-            Subscription.end_date > now,
-            Subscription.status == 'active'
-        ).first()
-        return (active is not None) or self.is_premium_member
+        if self.is_premium:
+            if self.premium_ends_at and self.premium_ends_at > now:
+                return True
+            else:
+                # Premium expired
+                self.is_premium = False
+                db.session.commit()
+        
+        if self.trial_ends_at and self.trial_ends_at > now:
+            return True
+        
+        return False
 
-class Subscription(db.Model):
-    __tablename__ = 'laure_subscription'
+class MessageLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('laure_user.id'), nullable=False)
-    plan_type = db.Column(db.String(20))
-    start_date = db.Column(db.DateTime, default=datetime.utcnow)
-    end_date = db.Column(db.DateTime, nullable=False)
-    status = db.Column(db.String(20), default='active')
-    transaction_id = db.Column(db.String(100), unique=True)
-
-class Interaction(db.Model):
-    __tablename__ = 'laure_interaction'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('laure_user.id'), nullable=False)
-    last_message = db.Column(db.Text)
-    status = db.Column(db.String(20), default='pending') 
+    platform = db.Column(db.String(50))
+    platform_id = db.Column(db.String(100))
+    message_id = db.Column(db.String(100))
+    content = db.Column(db.Text)
+    sender_name = db.Column(db.String(100))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-class Course(db.Model):
-    __tablename__ = 'laure_course'
+class QuizSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('laure_user.id'), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    target_group = db.Column(db.String(100))
-    scheduled_time = db.Column(db.DateTime, nullable=False)
-    is_sent = db.Column(db.Boolean, default=False)
-    platform = db.Column(db.String(20))
+    group_id = db.Column(db.String(100))
+    status = db.Column(db.String(50)) # 'active', 'completed'
+    current_question_index = db.Column(db.Integer, default=0)
+    total_questions = db.Column(db.Integer, default=20)
+    correct_answers_count = db.Column(db.Integer, default=0)
+    questions_data = db.Column(db.Text) # JSON string of questions and correct answers
+    responses = db.Column(db.Text) # JSON string of user answers
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class ScheduledCourse(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    title = db.Column(db.String(200))
+    target_jid = db.Column(db.String(100)) # Group or User JID
+    day_of_week = db.Column(db.Integer) # 0-6 (Mon-Sun)
+    scheduled_time = db.Column(db.String(10)) # "HH:MM"
+    is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

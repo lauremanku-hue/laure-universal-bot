@@ -1,4 +1,1 @@
-web: gunicorn --bind 0.0.0.0:$PORT laure_bot:app
-worker: celery -A celery_worker.celery_app worker --loglevel=info
-
-
+web: gunicorn app:app --bind 0.0.0.0:3000 --timeout 600 --workers 1 --threads 8
