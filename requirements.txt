@@ -5,6 +5,7 @@ requests
 gunicorn
 python-dotenv
 google-generativeai
+google-genai
 yt-dlp
 apscheduler
 Pillow
