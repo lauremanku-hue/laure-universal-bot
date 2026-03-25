@@ -75,9 +75,12 @@ def index():
     resp.headers['Expires'] = '0'
     return resp
 
-@main.route('/pair', methods=['POST'])
+@main.route('/pair', methods=['GET', 'POST'])
 def pair_with_phone():
     from flask import current_app, redirect, url_for, request
+    if request.method == 'GET':
+        return redirect(url_for('main.index'))
+    
     phone = request.form.get('phone')
     if not phone:
         return redirect(url_for('main.index'))
