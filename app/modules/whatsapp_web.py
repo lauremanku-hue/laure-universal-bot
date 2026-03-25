@@ -1,4 +1,3 @@
-
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 import os
@@ -36,7 +35,7 @@ class LaureWebBot:
             current_time = now.strftime("%H:%M")
             current_day = now.weekday()
             
-            from .models import ScheduledCourse
+            from app.models import ScheduledCourse
             courses = ScheduledCourse.query.filter_by(
                 day_of_week=current_day, 
                 scheduled_time=current_time, 
@@ -260,19 +259,19 @@ class LaureWebBot:
         # On utilise une méthode de détection dynamique pour enregistrer le gestionnaire de messages
         # car l'API de neonize peut varier selon la version installée.
         try:
-            if hasattr(self.client, 'event_handler'):
-                self.client.event_handler(Message)(self.on_message)
-            elif hasattr(self.client, 'on_message'):
-                self.client.on_message(self.on_message)
-            else:
-                # Fallback pour les versions qui utilisent un décorateur 'on'
-                self.client.on(Message)(self.on_message)
+            # La méthode standard pour neonize est client.event(Message)(handler)
+            self.client.event(Message)(self.on_message)
             print("✅ Gestionnaire d'événements WhatsApp configuré.")
         except Exception as e:
             print(f"⚠️ Erreur lors de la configuration des événements : {e}")
-            # Tentative ultime
+            # Tentatives alternatives
             try:
-                self.client.register_handler(Message, self.on_message)
+                if hasattr(self.client, 'event_handler'):
+                    self.client.event_handler(Message)(self.on_message)
+                elif hasattr(self.client, 'on_message'):
+                    self.client.on_message(self.on_message)
+                else:
+                    self.client.on(Message)(self.on_message)
             except:
                 pass
         
