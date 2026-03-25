@@ -1,6 +1,6 @@
 flask
 flask-sqlalchemy
-neonize
+git+https://github.com/krypton-byte/neonize.git
 requests
 gunicorn
 python-dotenv
