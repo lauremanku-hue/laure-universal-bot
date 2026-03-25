@@ -268,22 +268,16 @@ class LaureWebBot:
     def start(self, app=None):
         self.app = app
         
-        # On utilise une méthode de détection dynamique pour enregistrer le gestionnaire de messages
-        # car l'API de neonize peut varier selon la version installée.
+        # Enregistrement du gestionnaire de messages
         try:
-            # La méthode standard pour neonize est client.event(Message)(handler)
+            # On utilise le décorateur de manière explicite
             self.client.event(Message)(self.on_message)
             print("✅ Gestionnaire d'événements WhatsApp configuré.")
         except Exception as e:
             print(f"⚠️ Erreur lors de la configuration des événements : {e}")
-            # Tentatives alternatives
+            # Fallback pour d'autres versions
             try:
-                if hasattr(self.client, 'event_handler'):
-                    self.client.event_handler(Message)(self.on_message)
-                elif hasattr(self.client, 'on_message'):
-                    self.client.on_message(self.on_message)
-                else:
-                    self.client.on(Message)(self.on_message)
+                self.client.register_handler(Message, self.on_message)
             except:
                 pass
         
