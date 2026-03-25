@@ -136,7 +136,7 @@ class AIHandler:
 
     def generate_quiz_questions(self, topic, count=20):
         """Génère une liste de questions de quiz sur un sujet donné."""
-        prompt = f"Génère {count} questions de quiz à choix multiples (A, B, C, D) sur le thème : '{topic}'. Pour chaque question, indique la bonne réponse. Format JSON : [{\"q\": \"...\", \"a\": \"...\", \"b\": \"...\", \"c\": \"...\", \"d\": \"...\", \"correct\": \"A\"}, ...]"
+        prompt = f'Génère {count} questions de quiz à choix multiples (A, B, C, D) sur le thème : "{topic}". Pour chaque question, indique la bonne réponse. Format JSON : [{"q": "...", "a": "...", "b": "...", "c": "...", "d": "...", "correct": "A"}, ...]'
         try:
             response = self.text_model.generate_content(prompt)
             text = response.text.replace("```json", "").replace("```", "").strip()
