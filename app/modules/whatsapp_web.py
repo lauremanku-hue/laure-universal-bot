@@ -1,3 +1,4 @@
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 import os
@@ -73,17 +74,28 @@ class LaureWebBot:
             print(f"📲 Demande de code de couplage pour : {phone}")
             
             # Dans neonize, la méthode peut varier selon la version
-            if hasattr(self.client, 'pair_with_code'):
-                code = self.client.pair_with_code(phone)
-            elif hasattr(self.client, 'PairWithCode'):
-                code = self.client.PairWithCode(phone)
-            else:
-                # Fallback si la méthode n'est pas directement sur le client
-                # Certaines versions utilisent client.PairWithCode(phone)
+            methods = ['pair_with_phone', 'PairWithPhone', 'pair_with_code', 'PairWithCode']
+            code = None
+            
+            for method_name in methods:
+                if hasattr(self.client, method_name):
+                    print(f"🔍 Utilisation de la méthode : {method_name}")
+                    method = getattr(self.client, method_name)
+                    code = method(phone)
+                    break
+            
+            if not code:
+                # Tentative directe si hasattr échoue (parfois le cas avec les wrappers Go)
                 try:
-                    code = self.client.PairWithCode(phone)
+                    print("🔍 Tentative directe de pair_with_phone...")
+                    code = self.client.pair_with_phone(phone)
                 except:
-                    return {"status": "error", "message": "Méthode de couplage non supportée par cette version de neonize."}
+                    try:
+                        print("🔍 Tentative directe de PairWithPhone...")
+                        code = self.client.PairWithPhone(phone)
+                    except Exception as e:
+                        print(f"❌ Toutes les méthodes de couplage ont échoué : {e}")
+                        return {"status": "error", "message": f"Méthode de couplage non supportée ou erreur : {e}"}
             
             self.pairing_code = code
             return {"status": "success", "code": code}
