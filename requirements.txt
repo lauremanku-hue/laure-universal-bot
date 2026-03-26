@@ -4,7 +4,6 @@ git+https://github.com/krypton-byte/neonize.git
 requests
 gunicorn
 python-dotenv
-google-generativeai
 google-genai
 yt-dlp
 apscheduler
