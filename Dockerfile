@@ -1,4 +1,4 @@
-FROM python:3.11
+FROM python:3.11-bookworm
 
 # Installer les dépendances système nécessaires
 RUN apt-get update && apt-get install -y \
@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     ca-certificates \
     curl \
+    wget \
     gcc \
     python3-dev \
     g++ \
@@ -31,9 +32,12 @@ COPY requirements.txt .
 # Installer les dépendances Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Forcer le téléchargement du binaire neonize pendant la phase de build
-# Cela évite l'erreur "UnsupportedPlatform" au démarrage du conteneur
-RUN python3 -c "from neonize.download import download; download()" || true
+# FORCER LE TÉLÉCHARGEMENT DU BINAIRE NEONIZE MANUELLEMENT
+# Cela résout définitivement l'erreur "UnsupportedPlatform"
+RUN NEONIZE_PATH=$(python3 -c "import neonize; import os; print(os.path.dirname(neonize.__file__))") && \
+    cd $NEONIZE_PATH && \
+    wget https://github.com/krypton-byte/neonize/releases/download/v1.2.0/neonize-linux-amd64.so -O neonize-linux-amd64.so && \
+    chmod +x neonize-linux-amd64.so
 
 # Copier le reste du code
 COPY . .
