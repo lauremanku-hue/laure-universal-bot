@@ -36,7 +36,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Cela résout définitivement l'erreur "UnsupportedPlatform"
 RUN NEONIZE_PATH=$(python3 -c "import neonize; import os; print(os.path.dirname(neonize.__file__))") && \
     cd $NEONIZE_PATH && \
-    wget https://github.com/krypton-byte/neonize/releases/download/v1.2.0/neonize-linux-amd64.so -O neonize-linux-amd64.so && \
+    wget https://github.com/krypton-byte/neonize/releases/download/0.3.15.post0/neonize-linux-amd64.so -O neonize-linux-amd64.so && \
     chmod +x neonize-linux-amd64.so
 
 # Copier le reste du code
