@@ -5,67 +5,50 @@ from PIL import Image
 import requests
 from io import BytesIO
 import base64
+import json  # N'oublie pas d'importer json pour tes méthodes de quiz/devinettes
 
 class AIHandler:
     def __init__(self):
         self.api_key = os.getenv('GEMINI_API_KEY')
         if self.api_key:
-            genai.configure(api_key=self.api_key)
-            # Modèle pour le texte (raisonnement et chat)
-            self.text_model = genai.GenerativeModel('gemini-3-flash-preview')
-            # Modèle pour la génération d'images
-            self.image_model = genai.GenerativeModel('gemini-2.5-flash-image')
+            # CORRECT : On crée un client avec le nouveau SDK
+            self.client = genai.Client(api_key=self.api_key)
+            # Noms des modèles (Vérifie bien les noms officiels disponibles)
+            self.text_model_name = 'gemini-2.0-flash' 
         else:
-            print("⚠️ GEMINI_API_KEY non trouvée dans les variables d'environnement")
+            print("⚠️ GEMINI_API_KEY non trouvée")
 
     def chat(self, prompt, image_path=None, mode='normal'):
-        """
-        Traite une demande textuelle et/ou visuelle.
-        Mode 'professeur' : Guide l'élève au lieu de donner la réponse.
-        """
         if not self.api_key:
-            return "Désolé, mon cerveau (IA) n'est pas configuré. Contacte l'administrateur."
+            return "Désolé, mon cerveau n'est pas configuré."
         
         try:
-            # Instructions système selon le mode
-            system_instruction = (
-                "Tu es Laure, une assistante intelligente, amicale et serviable sur WhatsApp. "
-                "Tu aides les élèves dans leurs devoirs et leur quotidien."
-            )
-            
+            system_instruction = "Tu es Laure, une assistante intelligente et amicale sur WhatsApp."
             if mode == 'professeur':
-                system_instruction += (
-                    "\n⚠️ MODE PROFESSEUR ACTIVÉ : Ne donne JAMAIS la réponse directement. "
-                    "Analyse l'erreur de l'élève ou l'énoncé, et pose-lui une question pour le guider "
-                    "vers la solution. Sois encourageante et patiente."
-                )
+                system_instruction += "\nMODE PROFESSEUR : Guide l'élève sans donner la réponse."
 
-            # Préparation du contenu (Multimodal si image présente)
+            # Préparation du contenu pour le nouveau SDK
             contents = []
             if image_path and os.path.exists(image_path):
                 img = Image.open(image_path)
                 contents.append(img)
-                prompt = f"Analyse cette image et aide-moi : {prompt}" if prompt else "Que vois-tu sur cette image ? Aide-moi à comprendre."
             
-            contents.append(prompt)
+            contents.append(prompt if prompt else "Analyse cette image.")
 
-            # Appel à Gemini
-            response = self.text_model.generate_content(
-                contents,
-                generation_config=genai.types.GenerationConfig(
-                    candidate_count=1,
-                    stop_sequences=['x'],
+            # CORRECT : Appel avec le nouveau client
+            response = self.client.models.generate_content(
+                model=self.text_model_name,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
                     max_output_tokens=1000,
                     temperature=0.7
                 )
             )
-            
-            # On injecte l'instruction système via le prompt si le SDK ne supporte pas encore system_instruction nativement sur ce modèle
-            # (Ou on utilise la méthode recommandée si disponible)
             return response.text
         except Exception as e:
             print(f"❌ Erreur chat IA : {e}")
-            return "Oups, j'ai eu un petit bug en réfléchissant. Réessaie plus tard !"
+            return "Oups, petit bug !"
 
     def generate_image_from_text(self, text):
         """
