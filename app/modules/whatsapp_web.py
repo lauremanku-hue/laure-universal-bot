@@ -69,38 +69,26 @@ class LaureWebBot:
     def get_pairing_code(self, phone_number):
         """Génère un code de couplage pour un numéro de téléphone."""
         try:
-            # Nettoyage du numéro (doit être au format international sans +)
+            # Nettoyage du numéro
             phone = "".join(filter(str.isdigit, phone_number))
-            print(f"📲 Demande de code de couplage pour : {phone}")
+            print(f"📲 Demande de code pour : {phone}")
             
-            # Dans neonize, la méthode peut varier selon la version
-            methods = ['pair_with_phone', 'PairWithPhone', 'pair_with_code', 'PairWithCode']
-            code = None
-            
-            for method_name in methods:
-                if hasattr(self.client, method_name):
-                    print(f"🔍 Utilisation de la méthode : {method_name}")
-                    method = getattr(self.client, method_name)
-                    code = method(phone)
-                    break
-            
-            if not code:
-                # Tentative directe si hasattr échoue (parfois le cas avec les wrappers Go)
-                try:
-                    print("🔍 Tentative directe de pair_with_phone...")
-                    code = self.client.pair_with_phone(phone)
-                except:
-                    try:
-                        print("🔍 Tentative directe de PairWithPhone...")
-                        code = self.client.PairWithPhone(phone)
-                    except Exception as e:
-                        print(f"❌ Toutes les méthodes de couplage ont échoué : {e}")
-                        return {"status": "error", "message": f"Méthode de couplage non supportée ou erreur : {e}"}
-            
-            self.pairing_code = code
-            return {"status": "success", "code": code}
+            # Dans les versions récentes, c'est souvent 'pair_with_phone' 
+            # ou via le gestionnaire de connexion. 
+            # On tente d'abord la méthode standard en minuscules
+            try:
+                code = self.client.pair_with_phone(phone)
+                if code:
+                    self.pairing_code = code
+                    return {"status": "success", "code": code}
+            except Exception as e:
+                print(f"⚠️ Échec de pair_with_phone : {e}")
+
+            # Si ça échoue, on tente une approche plus directe si disponible
+            return {"status": "error", "message": "La méthode de couplage n'est pas reconnue par cette version de Neonize."}
+
         except Exception as e:
-            print(f"❌ Erreur pairing code : {e}")
+            print(f"❌ Erreur critique pairing : {e}")
             return {"status": "error", "message": str(e)}
 
     def on_message(self, client, event: Message):
