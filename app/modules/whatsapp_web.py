@@ -67,28 +67,36 @@ class LaureWebBot:
                     pass
 
     def get_pairing_code(self, phone_number):
-        """Génère un code de couplage pour un numéro de téléphone."""
         try:
-            # Nettoyage du numéro
             phone = "".join(filter(str.isdigit, phone_number))
-            print(f"📲 Demande de code pour : {phone}")
-            
-            # Dans les versions récentes, c'est souvent 'pair_with_phone' 
-            # ou via le gestionnaire de connexion. 
-            # On tente d'abord la méthode standard en minuscules
-            try:
-                code = self.client.pair_with_phone(phone)
-                if code:
-                    self.pairing_code = code
-                    return {"status": "success", "code": code}
-            except Exception as e:
-                print(f"⚠️ Échec de pair_with_phone : {e}")
+            print(f"📲 Tentative de couplage pour : {phone}")
 
-            # Si ça échoue, on tente une approche plus directe si disponible
-            return {"status": "error", "message": "La méthode de couplage n'est pas reconnue par cette version de Neonize."}
+            # Tentative via la méthode 'pair' qui est parfois utilisée dans les nouvelles versions
+            try:
+                # Sur certaines versions, c'est cette syntaxe :
+                code = self.client.pair(phone)
+                if code:
+                    return {"status": "success", "code": code}
+            except:
+                pass
+
+            # Si le client est déjà connecté, il ne peut pas générer de code
+            if self.client.is_connected():
+                return {"status": "error", "message": "Déjà connecté !"}
+
+            # DERNIER RECOURS : On force l'appel via la propriété interne si elle existe
+            # Dans certaines versions de neonize, c'est 'PairWithPhone' avec les majuscules exactes
+            # mais accessible différemment.
+            method = getattr(self.client, "PairWithPhone", None) or getattr(self.client, "pair_with_phone", None)
+            
+            if method:
+                code = method(phone)
+                return {"status": "success", "code": code}
+            else:
+                return {"status": "error", "message": "Méthode introuvable. Essaie de mettre à jour neonize dans requirements.txt"}
 
         except Exception as e:
-            print(f"❌ Erreur critique pairing : {e}")
+            print(f"❌ Erreur : {e}")
             return {"status": "error", "message": str(e)}
 
     def on_message(self, client, event: Message):
