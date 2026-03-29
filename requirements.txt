@@ -1,6 +1,6 @@
 flask
 flask-sqlalchemy
-neonize
+neonize==0.3.15.post0
 requests
 gunicorn
 python-dotenv
