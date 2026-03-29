@@ -127,3 +127,4 @@ class AIHandler:
             return json.loads(text)
         except:
             return []
+            
