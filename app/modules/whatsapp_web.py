@@ -65,41 +65,26 @@ class LaureWebBot:
                 except:
                     pass
 
+    # ... (imports)
     def get_pairing_code(self, phone_number):
-        """Génère un code de couplage pour un numéro de téléphone."""
         try:
             phone = "".join(filter(str.isdigit, phone_number))
-            print(f"📲 Tentative de couplage pour : {phone}")
-
-            # 1. Vérification de la connexion (Gestion bool vs function)
-            connected = self.client.is_connected
-            if callable(connected):
-                connected = connected()
+            print(f"📲 Demande de code de couplage pour : {phone}")
             
-            if connected:
-                return {"status": "error", "message": "Déjà connecté !"}
-
-            # 2. Tentative de couplage
-            # On cherche la méthode (pair_with_phone ou PairWithPhone)
-            method_name = None
-            if hasattr(self.client, "pair_with_phone"):
-                method_name = "pair_with_phone"
-            elif hasattr(self.client, "PairWithPhone"):
-                method_name = "PairWithPhone"
-
-            if method_name:
-                method = getattr(self.client, method_name)
-                # Si c'est une méthode, on l'appelle, sinon on prend la valeur
-                code = method(phone) if callable(method) else method
-                
-                self.pairing_code = code
-                return {"status": "success", "code": code}
+            # Tentative avec les différentes méthodes possibles dans Neonize
+            try:
+                code = self.client.pair_with_phone(phone)
+            except:
+                try:
+                    code = self.client.PairWithPhone(phone)
+                except Exception as e:
+                    return {"status": "error", "message": f"Erreur de couplage : {e}"}
             
-            return {"status": "error", "message": "Méthode de couplage introuvable sur ce client."}
-
+            self.pairing_code = code
+            return {"status": "success", "code": code}
         except Exception as e:
-            print(f"❌ Erreur critique pairing : {e}")
-            return {"status": "error", "message": f"Erreur technique : {e}"}
+            return {"status": "error", "message": str(e)}
+# ...
 
     def on_message(self, client, event: Message):
         if event.Info.IsFromMe: return
