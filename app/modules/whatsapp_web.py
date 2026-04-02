@@ -1,10 +1,11 @@
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 import os
 import json
 import time
 from neonize.client import NewClient
-from neonize.events import Message
+from neonize.events import Message as WhatsAppMessage
 from .ai_handler import AIHandler
 from .downloader import download_media
 
@@ -15,10 +16,11 @@ from app.models import User, MessageLog, QuizSession
 
 class LaureWebBot:
     def __init__(self):
+        db_path = "/data/laure_session.db"
         try:
-            self.client = NewClient("laure_session.db")
+            self.client = NewClient(db_path)
         except:
-            self.client = NewClient("laure_session.db") 
+            self.client = NewClient(db_path) 
 
         self.ai = AIHandler()
         self.pairing_code = None
@@ -65,28 +67,44 @@ class LaureWebBot:
                 except:
                     pass
 
-    # ... (imports)
     def get_pairing_code(self, phone_number):
+        """Génère un code de couplage pour un numéro de téléphone."""
         try:
+            # Nettoyage du numéro (doit être au format international sans +)
             phone = "".join(filter(str.isdigit, phone_number))
             print(f"📲 Demande de code de couplage pour : {phone}")
             
-            # Tentative avec les différentes méthodes possibles dans Neonize
-            try:
-                code = self.client.pair_with_phone(phone)
-            except:
+            # Dans neonize, la méthode peut varier selon la version
+            methods = ['pair_with_phone', 'PairWithPhone', 'pair_with_code', 'PairWithCode']
+            code = None
+            
+            for method_name in methods:
+                if hasattr(self.client, method_name):
+                    print(f"🔍 Utilisation de la méthode : {method_name}")
+                    method = getattr(self.client, method_name)
+                    code = method(phone)
+                    break
+            
+            if not code:
+                # Tentative directe si hasattr échoue (parfois le cas avec les wrappers Go)
                 try:
-                    code = self.client.PairWithPhone(phone)
-                except Exception as e:
-                    return {"status": "error", "message": f"Erreur de couplage : {e}"}
+                    print("🔍 Tentative directe de pair_with_phone...")
+                    code = self.client.pair_with_phone(phone)
+                except:
+                    try:
+                        print("🔍 Tentative directe de PairWithPhone...")
+                        code = self.client.PairWithPhone(phone)
+                    except Exception as e:
+                        print(f"❌ Toutes les méthodes de couplage ont échoué : {e}")
+                        return {"status": "error", "message": f"Méthode de couplage non supportée ou erreur : {e}"}
             
             self.pairing_code = code
             return {"status": "success", "code": code}
         except Exception as e:
+            print(f"❌ Erreur pairing code : {e}")
             return {"status": "error", "message": str(e)}
-# ...
 
-    def on_message(self, client, event: Message):
+    def on_message(self, client, event: WhatsAppMessage):
         if event.Info.IsFromMe: return
 
         # Récupération du texte et de l'image éventuelle
@@ -254,13 +272,13 @@ class LaureWebBot:
         # Enregistrement du gestionnaire de messages
         try:
             # On utilise le décorateur de manière explicite
-            self.client.event(Message)(self.on_message)
+            self.client.event(WhatsAppMessage)(self.on_message)
             print("✅ Gestionnaire d'événements WhatsApp configuré.")
         except Exception as e:
             print(f"⚠️ Erreur lors de la configuration des événements : {e}")
             # Fallback pour d'autres versions
             try:
-                self.client.register_handler(Message, self.on_message)
+                self.client.register_handler(WhatsAppMessage, self.on_message)
             except:
                 pass
         
